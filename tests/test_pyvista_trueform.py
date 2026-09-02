@@ -536,6 +536,56 @@ def test_csg_graph_operands_reuse_accessor_cache():
     assert graph.forms[1] is b.trueform.to_mesh()
 
 
+# -- arrangements and domains --------------------------------------------
+
+
+def test_mesh_arrangements_labeled():
+    a = _cube()
+    b = _cube(center=(0.5, 0.5, 0.5))
+    arranged = tfpv.mesh_arrangements([a, b])
+    assert arranged.n_cells > a.n_cells + b.n_cells
+    assert set(np.unique(arranged.cell_data["trueform_labels"])) == {0, 1}
+    assert len(arranged.cell_data["trueform_face_labels"]) == arranged.n_cells
+
+    with_curves, curves = tfpv.mesh_arrangements([a, b], return_curves=True)
+    assert with_curves.n_cells == arranged.n_cells
+    assert curves.GetNumberOfLines() > 0
+
+
+def test_domains_of_two_cubes():
+    a = _cube()
+    b = _cube(center=(0.5, 0.5, 0.5))
+    blocks = tfpv.domains([a, b])
+    assert isinstance(blocks, pv.MultiBlock)
+    assert blocks.n_blocks == 3  # A-only, B-only, and the shared core
+
+    union_volume = a.trueform.union(b).volume
+    assert sum(block.volume for block in blocks) == pytest.approx(
+        union_volume, rel=1e-4)
+    for block in blocks:
+        assert block.trueform.is_closed()
+
+    graph = tfpv.csg_graph([a, b])
+    core = tfpv.domains(graph, tf.op(0) & tf.op(1))
+    assert core.n_blocks == 1
+    assert core[0].volume == pytest.approx(0.125, rel=1e-4)
+    assert core.keys()[0] == str(graph.domains(tf.op(0) & tf.op(1))[1][0])
+
+
+def test_domains_block_names_are_domain_ids():
+    a = _cube()
+    b = _cube(center=(0.5, 0.5, 0.5))
+    graph = tfpv.csg_graph([a, b])
+    cells, ids = graph.domains()
+    assert tfpv.domains(graph).keys() == [str(domain_id) for domain_id in ids]
+
+    blocks = tfpv.domains_to_pyvista(cells, ids)  # zero-copy assembly
+    assert blocks.keys() == [str(domain_id) for domain_id in ids]
+    for block, (faces, points) in zip(blocks, cells):
+        assert block.n_cells == len(faces)
+        assert np.shares_memory(np.asarray(block.points), points)
+
+
 # -- packaging -----------------------------------------------------------
 
 

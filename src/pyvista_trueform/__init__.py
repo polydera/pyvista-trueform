@@ -11,14 +11,18 @@ https://github.com/polydera/pyvista-trueform
 # Importing _accessor registers the .trueform accessor on pyvista.PolyData.
 # Installed wheels also reach it through PyVista's lazy accessor entry point.
 from ._accessor import TrueformAccessor
-from ._conversion import curves_to_pyvista, to_pyvista, to_trueform
-from ._factory import csg_graph
+from ._conversion import (curves_to_pyvista, domains_to_pyvista,
+                          to_pyvista, to_trueform)
+from ._factory import csg_graph, domains, mesh_arrangements
 from ._io import read, write
 
 __all__ = [
     "TrueformAccessor",
     "csg_graph",
     "curves_to_pyvista",
+    "domains",
+    "domains_to_pyvista",
+    "mesh_arrangements",
     "read",
     "to_pyvista",
     "to_trueform",

@@ -189,4 +189,34 @@ def curves_to_pyvista(paths, points=None):
     return result
 
 
-__all__ = ["curves_to_pyvista", "to_pyvista", "to_trueform"]
+def domains_to_pyvista(cells, ids):
+    """Assemble trueform domain cells into a named PyVista MultiBlock.
+
+    Accepts the ``(cells, ids)`` pair :meth:`trueform.CsgGraph.domains`
+    returns — either as two arguments' worth in one tuple or separately.
+    Each domain mesh converts through :func:`to_pyvista` zero-copy; block
+    ``k`` is named ``str(ids[k])``.
+
+    Parameters
+    ----------
+    cells : list of (faces, points)
+        One mesh per kept domain.
+    ids : np.ndarray
+        ``ids[k]`` is the domain id of cell ``k``.
+
+    Returns
+    -------
+    pyvista.MultiBlock
+    """
+    if len(cells) != len(ids):
+        raise ValueError(
+            f"cells and ids must have equal length, got {len(cells)} cells "
+            f"and {len(ids)} ids")
+    result = pv.MultiBlock()
+    for cell, domain_id in zip(cells, ids):
+        result.append(to_pyvista(cell), str(domain_id))
+    return result
+
+
+__all__ = ["curves_to_pyvista", "domains_to_pyvista", "to_pyvista",
+           "to_trueform"]
