@@ -586,6 +586,72 @@ def test_domains_block_names_are_domain_ids():
         assert np.shares_memory(np.asarray(block.points), points)
 
 
+# -- registration ---------------------------------------------------------
+
+
+def _rotation_translation(angle_degrees, translation, dtype):
+    angle = np.radians(angle_degrees)
+    matrix = np.eye(4, dtype=dtype)
+    matrix[:2, :2] = [[np.cos(angle), -np.sin(angle)],
+                      [np.sin(angle), np.cos(angle)]]
+    matrix[:3, 3] = translation
+    return matrix
+
+
+def _applied(matrix, points):
+    return points @ matrix[:3, :3].T.astype(points.dtype) \
+        + matrix[:3, 3].astype(points.dtype)
+
+
+def _elongated_cloud():
+    rng = np.random.default_rng(7)
+    return (rng.random((300, 3)) *
+            [4.0, 1.0, 0.5]).astype(np.float32)
+
+
+def test_align_rigid_recovers_known_transform():
+    sphere = pv.Sphere()
+    truth = _rotation_translation(30.0, [0.3, -0.2, 0.5], np.float32)
+    moved = sphere.copy()
+    moved.points = _applied(truth, np.asarray(sphere.points))
+
+    recovered = tfpv.align(moved, sphere, method="rigid")
+    assert recovered.shape == (4, 4)
+    # Corresponding points, so the recovered delta is the exact inverse.
+    np.testing.assert_allclose(
+        _applied(recovered, np.asarray(moved.points)),
+        np.asarray(sphere.points), atol=1e-4)
+
+
+@pytest.mark.parametrize("method,tolerance", [("icp", 0.01), ("obb", 1e-4),
+                                              ("knn", 0.01)])
+def test_align_correspondence_free_methods(method, tolerance):
+    points = _elongated_cloud()
+    degrees, shift = (20.0, [0.4, -0.3, 0.2])
+    if method == "knn":  # one soft-correspondence step: small motion only
+        degrees, shift = (0.0, [0.05, 0.02, 0.03])
+    truth = _rotation_translation(degrees, shift, np.float32)
+    moved = _applied(truth, points)
+
+    recovered = tfpv.align(moved, points, method=method)
+    assert tfpv.chamfer_distance(
+        _applied(recovered, moved), points) < tolerance
+
+
+def test_align_refuses_unknown_method():
+    with pytest.raises(ValueError, match="supported"):
+        tfpv.align(pv.Sphere(), pv.Sphere(), method="banana")
+
+
+def test_chamfer_distance_exact_shift():
+    cube = _cube()
+    shifted = cube.copy()
+    shifted.points = (np.asarray(cube.points)
+                      + np.array([0.25, 0.0, 0.0], dtype=np.float32))
+    # Every corner's nearest neighbor sits exactly a quarter side away.
+    assert tfpv.chamfer_distance(shifted, cube) == 0.25
+
+
 # -- packaging -----------------------------------------------------------
 
 

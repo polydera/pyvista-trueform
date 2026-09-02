@@ -15,9 +15,12 @@ from ._conversion import (curves_to_pyvista, domains_to_pyvista,
                           to_pyvista, to_trueform)
 from ._factory import csg_graph, domains, mesh_arrangements
 from ._io import read, write
+from ._registration import align, chamfer_distance
 
 __all__ = [
     "TrueformAccessor",
+    "align",
+    "chamfer_distance",
     "csg_graph",
     "curves_to_pyvista",
     "domains",
