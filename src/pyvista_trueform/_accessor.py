@@ -19,10 +19,7 @@ def _operand_mesh(other):
     if isinstance(other, tf.Mesh):
         return other
     if isinstance(other, pv.PolyData):
-        accessor = getattr(other, "trueform", None)
-        if accessor is not None:
-            return accessor.to_mesh()
-        return to_trueform(other)
+        return other.trueform.to_mesh()
     raise TypeError(
         "operand must be a pyvista.PolyData or trueform.Mesh, "
         f"got {type(other).__name__}")
@@ -236,8 +233,7 @@ class TrueformAccessor:
         return tf.is_manifold(self.to_mesh())
 
 
-if hasattr(pv, "register_dataset_accessor"):
-    pv.register_dataset_accessor("trueform", pv.PolyData)(TrueformAccessor)
+pv.register_dataset_accessor("trueform", pv.PolyData)(TrueformAccessor)
 
 
 __all__ = ["TrueformAccessor"]

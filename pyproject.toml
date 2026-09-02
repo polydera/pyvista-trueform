@@ -23,7 +23,7 @@ keywords = [
 ]
 dependencies = [
   "trueform>=0.10.0",
-  "pyvista>=0.43",
+  "pyvista>=0.48",
   "numpy>=1.23",
 ]
 

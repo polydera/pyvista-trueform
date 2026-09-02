@@ -394,8 +394,6 @@ def test_csg_graph_operands_reuse_accessor_cache():
 
 
 def test_entry_point_registers_accessor_without_import():
-    if not hasattr(pv, "register_dataset_accessor"):
-        pytest.skip("pyvista without accessor registry")
     code = (
         "import pyvista as pv\n"
         "sphere = pv.Sphere()\n"
