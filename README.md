@@ -128,15 +128,20 @@ the `(paths, points)` pair any trueform curve producer returns.
 
 ### Examples
 
-Six standalone scripts in `examples/`, each with an importable
-`compute()` and a plotting `main()` (`python examples/<name>.py`):
+Seven standalone scripts in `examples/`, each with an importable
+`compute()` and a plotting `main()` (`python examples/<name>.py`); the
+gallery ships in the Polydera color scheme through the shared
+`examples/_theme.py`:
 
-- `booleans_and_picking.py` — union and difference with labels, domains,
-  and ray picking that names the block.
+- `boolean.py` — a boolean difference recut live under a dragged sphere
+  widget, the result labeled by source.
 - `csg_fracture.py` — a sphere minus a grid of cutters through one
-  csg_graph expression, read back as volumetric chunks.
+  csg_graph expression, read back as volumetric chunks; clicking a chunk
+  names it through `closest`.
 - `isobands.py` — height isobands and isocontours overlaid on a
   surface, recut live from a band-count slider.
+- `curvature.py` — Gaussian curvature across a torus and mean curvature
+  across a hills surface, from one `principal_curvatures` call each.
 - `remesh_and_simplify.py` — remeshed, decimated, and simplified side by
   side.
 - `alignment.py` — a transformed copy registered back with `align`,

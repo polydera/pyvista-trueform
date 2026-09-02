@@ -43,12 +43,20 @@ def compute():
 
 
 def main():
+    import _theme
     target, moved, aligned, before, after = compute()
     print(f"chamfer before: {before:.4f}, after: {after:.2e}")
-    plotter = pv.Plotter()
-    plotter.add_mesh(target, color="lightgray", opacity=0.6)
-    plotter.add_mesh(moved, color="salmon", opacity=0.4)
-    plotter.add_mesh(aligned, color="teal")
+    plotter = pv.Plotter(theme=_theme.theme())
+    plotter.add_mesh(target, color=_theme.LIGHT, style="wireframe",
+                     opacity=0.3, line_width=1,
+                     render_lines_as_tubes=False)
+    plotter.add_mesh(moved, color=_theme.ROSE, opacity=0.45)
+    plotter.add_mesh(aligned, color=_theme.TEAL)
+    plotter.add_text(f"chamfer {before:.3f} -> {after:.2e}",
+                     position="lower_left", font_size=12,
+                     color=_theme.LIGHT)
+    plotter.view_vector((0.5, -1.0, 0.55), viewup=(0.0, 0.0, 1.0))
+    plotter.camera.zoom(1.25)
     plotter.show()
 
 

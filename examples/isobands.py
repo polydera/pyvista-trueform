@@ -31,12 +31,13 @@ def compute(n_bands=7):
 
 
 def main():
+    import _theme
     hills = pv.ParametricRandomHills()
     height = np.asarray(hills.points)[:, 2].copy()
     hills.point_data["height"] = height
     lo, hi = float(height.min()), float(height.max())
 
-    plotter = pv.Plotter()
+    plotter = pv.Plotter(theme=_theme.theme())
 
     def recut(n_bands):
         n = max(2, int(round(n_bands)))
@@ -44,13 +45,17 @@ def main():
         bands = hills.trueform.isobands("height", cuts)
         contours = hills.trueform.isocontours("height", cuts)
         plotter.add_mesh(bands, name="bands", scalars="trueform_labels",
-                         cmap="terrain", show_scalar_bar=False)
-        plotter.add_mesh(contours, name="contours", color="black",
-                         line_width=4, render_lines_as_tubes=True)
+                         cmap=_theme.polydera_cmap(
+                             bands.cell_data["trueform_labels"]),
+                         show_scalar_bar=False)
+        plotter.add_mesh(contours, name="contours", color=_theme.LIGHT,
+                         line_width=5, render_lines_as_tubes=True)
 
     recut(7)
     plotter.add_slider_widget(recut, rng=[2, 15], value=7, title="bands",
-                              fmt="%.0f")
+                              fmt="%.0f", color=_theme.LIGHT)
+    plotter.view_vector((0.5, -1.0, 0.55), viewup=(0.0, 0.0, 1.0))
+    plotter.camera.zoom(1.25)
     plotter.show()
 
 

@@ -908,10 +908,16 @@ def _example(name):
 
 
 def test_examples_compute():
-    union, difference, blocks, hit = _example("booleans_and_picking").compute()
-    assert union.n_cells > 0 and difference.n_cells > 0
-    assert blocks.n_blocks >= 3
-    assert hit is not None and 0 <= hit.block_index < blocks.n_blocks
+    base, carved = _example("boolean").compute()
+    assert carved.n_cells > 0
+    assert carved.trueform.volume() < base.trueform.volume()
+    assert set(np.unique(carved.cell_data["trueform_labels"])) == {0, 1}
+
+    torus, gaussian, hills, mean = _example("curvature").compute()
+    assert gaussian.shape == (torus.n_points,)
+    assert (gaussian > 0).any() and (gaussian < 0).any()
+    assert mean.shape == (hills.n_points,)
+    assert (mean > 0).any() and (mean < 0).any()
 
     chunks = _example("csg_fracture").compute()
     assert chunks.n_blocks == 27  # 2 cuts per axis -> 3**3 chunks
@@ -926,6 +932,8 @@ def test_examples_compute():
     assert remeshed.trueform.is_closed()
     assert 0 < decimated.n_cells <= 0.3 * source.n_cells
     assert 0 < simplified.n_cells < source.n_cells
+    assert (0.5 * decimated.n_cells <= simplified.n_cells
+            <= 2 * decimated.n_cells)
 
     _, _, _, before, after = _example("alignment").compute()
     assert after < 1e-3 < before
