@@ -83,10 +83,11 @@ plain PolyData works too, as block 0) — not just domains — and name WHICH
 block:
 
 ```python
+import trueform as tf
 from pyvista_trueform import csg_graph, domains, pick
 
 blocks = domains(csg_graph([a, b]))
-hit = pick(blocks, origin, direction)
+hit = pick(blocks, tf.Ray(origin=origin, direction=direction))
 # you picked block hit.block_index at hit.point
 ```
 
@@ -104,11 +105,13 @@ quadric-error tiers — boundary-, feature- and region-aware
 
 ### Queries
 
-`mesh.trueform.volume()`, `.area()`, `.ray_cast(origin, direction)`,
+`mesh.trueform.volume()`, `.area()`, `.ray_cast(ray, config=None)`,
 `.distance(other)`, `.intersects(other)`, `.closest_point(point)`,
 `.closest_point_pair(other)`, `.principal_curvatures()`, `.shape_index()`,
 and `.boundary_curves()` answer against the cached mesh, so the spatial
-tree amortizes across calls.
+tree amortizes across calls. Queries speak trueform primitives —
+`ray_cast` takes a `tf.Ray(origin=..., direction=...)`, single or a whole
+batch — and every value this package names "distance" is euclidean.
 
 ### Registration
 

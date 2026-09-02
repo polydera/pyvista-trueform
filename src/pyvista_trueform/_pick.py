@@ -7,7 +7,6 @@ Commercial licensing available via info@polydera.com.
 https://github.com/polydera/pyvista-trueform
 """
 
-import math
 from typing import NamedTuple
 
 import numpy as np
@@ -78,7 +77,7 @@ def _flat_blocks(target):
         yield index, block
 
 
-def pick(target, origin, direction):
+def pick(target, ray):
     """The first face of ``target`` in the ray's way, naming its block.
 
     Every block answers through its own accessor cache
@@ -91,17 +90,24 @@ def pick(target, origin, direction):
         The scene: one dataset, or blocks of them — any MultiBlock, e.g.
         the domains of a :func:`pyvista_trueform.csg_graph`. Nested
         MultiBlocks flatten; ``None`` blocks are skipped.
-    origin, direction : array-like of shape (3,)
-        The ray.
+    ray : trueform.Ray
+        A single ray; picking a batch of rays is future work.
 
     Returns
     -------
     RayHit or None
         ``None`` when every block misses.
     """
+    if not isinstance(ray, tf.Ray):
+        raise TypeError(
+            f"ray must be a trueform.Ray, got {type(ray).__name__}")
+    if ray.is_batch:
+        raise ValueError(
+            f"pick takes a single ray, got a batch of {ray.count}; "
+            "batch picking is future work")
     best = None
     for index, block in _flat_blocks(target):
-        hit = block.trueform.ray_cast(origin, direction)
+        hit = block.trueform.ray_cast(ray)
         if hit is None:
             continue
         face, t = hit
@@ -110,8 +116,8 @@ def pick(target, origin, direction):
     if best is None:
         return None
     index, block, face, t = best
-    point = (np.asarray(origin, dtype=np.float64)
-             + t * np.asarray(direction, dtype=np.float64))
+    point = (np.asarray(ray.origin, dtype=np.float64)
+             + t * np.asarray(ray.direction, dtype=np.float64))
     return RayHit(index, block, face, point, t)
 
 
@@ -148,8 +154,7 @@ def closest(target, query):
             (face, _), (distance, point, _) = \
                 block.trueform.closest_point_pair(query)
         else:
-            face, distance2, point = block.trueform.closest_point(query)
-            distance = math.sqrt(float(distance2))
+            face, distance, point = block.trueform.closest_point(query)
         if best is None or distance < best.distance:
             best = ClosestHit(index, block, face, point, distance)
     return best

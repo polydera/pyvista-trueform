@@ -41,15 +41,23 @@ class _QueriesMixin:
         """Enclosed volume of a closed mesh. See :func:`trueform.volume`."""
         return tf.volume(self.to_mesh())
 
-    def ray_cast(self, origin, direction):
+    def ray_cast(self, ray, config=None):
         """First mesh face hit by the ray, through the cached spatial tree.
 
-        Returns ``(face_id, t)`` with ``hit = origin + t * direction``, or
-        ``None`` when the ray misses. See :func:`trueform.ray_cast`.
+        ``ray`` is a :class:`trueform.Ray`, single or batch; ``config`` is
+        the optional ``(min_t, max_t)`` parametric range (scalars, or
+        per-ray arrays for a batch), forwarded verbatim. Returns exactly
+        what :func:`trueform.ray_cast` returns:
+
+        - single ray: ``(face_id, t)`` with ``hit = origin + t *
+          direction``, or ``None`` on a miss;
+        - batch ray: ``(face_ids, ts)`` arrays of shape ``(N,)``, a miss
+          marked ``-1`` in ``face_ids`` and ``NaN`` in ``ts``.
         """
-        ray = tf.Ray(origin=self._query_point(origin, "origin"),
-                     direction=self._query_point(direction, "direction"))
-        return tf.ray_cast(ray, self.to_mesh())
+        if not isinstance(ray, tf.Ray):
+            raise TypeError(
+                f"ray must be a trueform.Ray, got {type(ray).__name__}")
+        return tf.ray_cast(ray, self.to_mesh(), config=config)
 
     def distance(self, other):
         """Euclidean distance to ``other``.
@@ -71,12 +79,14 @@ class _QueriesMixin:
     def closest_point(self, query_point):
         """The mesh point closest to ``query_point``.
 
-        Returns ``(face_id, distance_squared, point)`` — the nearest face,
-        the squared distance, and the closest point on the mesh. See
-        :func:`trueform.neighbor_search`.
+        Returns ``(face_id, distance, point)`` — the nearest face, the
+        euclidean distance, and the closest point on the mesh. The
+        underlying :func:`trueform.neighbor_search` reports the squared
+        metric; this package says "distance" only for euclidean.
         """
-        return tf.neighbor_search(
+        face_id, distance2, point = tf.neighbor_search(
             self.to_mesh(), self._query_point(query_point, "query_point"))
+        return face_id, math.sqrt(float(distance2)), point
 
     def closest_point_pair(self, other):
         """The closest witness pair between this mesh and ``other``.

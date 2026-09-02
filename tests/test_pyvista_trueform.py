@@ -8,6 +8,7 @@ https://github.com/polydera/pyvista-trueform
 """
 
 import gc
+import math
 import subprocess
 import sys
 
@@ -48,6 +49,12 @@ def _polydata(points, polygons, *, index_dtype=np.int64):
 
 def _cube(center=(0.0, 0.0, 0.0)):
     return pv.Cube(center=center).triangulate()
+
+
+def _ray(origin, direction):
+    """A float32 trueform Ray, matching PyVista's float32 points."""
+    return tf.Ray(origin=np.asarray(origin, dtype=np.float32),
+                  direction=np.asarray(direction, dtype=np.float32))
 
 
 def _two_cubes_concatenated():
@@ -409,12 +416,34 @@ def test_accessor_measurements_exact():
 
 def test_accessor_ray_cast_known_hit():
     cube = _cube(center=(3.0, 0.0, 0.0))  # near face at x = 2.5
-    face_id, t = cube.trueform.ray_cast([0.0, 0.0, 0.0], [1.0, 0.0, 0.0])
+    face_id, t = cube.trueform.ray_cast(
+        _ray([0.0, 0.0, 0.0], [1.0, 0.0, 0.0]))
     assert t == 2.5
     hit_face = cube.regular_faces[face_id]
     np.testing.assert_array_equal(np.asarray(cube.points)[hit_face, 0],
                                   [2.5, 2.5, 2.5])
-    assert cube.trueform.ray_cast([0.0, 0.0, 5.0], [1.0, 0.0, 0.0]) is None
+    assert cube.trueform.ray_cast(
+        _ray([0.0, 0.0, 5.0], [1.0, 0.0, 0.0])) is None
+    # config is the (min_t, max_t) range, forwarded verbatim
+    assert cube.trueform.ray_cast(
+        _ray([0.0, 0.0, 0.0], [1.0, 0.0, 0.0]), config=(0.0, 2.0)) is None
+    with pytest.raises(TypeError, match="trueform.Ray"):
+        cube.trueform.ray_cast([0.0, 0.0, 0.0])
+
+
+def test_accessor_ray_cast_batch():
+    cube = _cube(center=(3.0, 0.0, 0.0))  # near face at x = 2.5
+    rays = _ray([[0.0, 0.0, 0.0], [0.0, 0.0, 5.0]],
+                [[1.0, 0.0, 0.0], [1.0, 0.0, 0.0]])
+    assert rays.is_batch
+    face_ids, ts = cube.trueform.ray_cast(rays)
+    assert face_ids.shape == (2,)
+    assert ts[0] == 2.5
+    np.testing.assert_array_equal(
+        np.asarray(cube.points)[cube.regular_faces[face_ids[0]], 0],
+        [2.5, 2.5, 2.5])
+    assert face_ids[1] == -1
+    assert np.isnan(ts[1])
 
 
 def test_accessor_distance_and_intersects():
@@ -432,8 +461,9 @@ def test_accessor_distance_and_intersects():
 
 def test_accessor_closest_point_on_corner():
     cube = _cube()
-    face_id, distance2, point = cube.trueform.closest_point([2.0, 2.0, 2.0])
-    assert distance2 == 6.75  # 3 * 1.5**2 to the (0.5, 0.5, 0.5) corner
+    face_id, distance, point = cube.trueform.closest_point([2.0, 2.0, 2.0])
+    # euclidean to the (0.5, 0.5, 0.5) corner: sqrt(3 * 1.5**2)
+    assert distance == math.sqrt(6.75)
     np.testing.assert_array_equal(point, [0.5, 0.5, 0.5])
     assert (cube.regular_faces[face_id]
             == cube.find_closest_point([0.5, 0.5, 0.5])).any()
@@ -659,7 +689,7 @@ def test_pick_names_the_domain_block():
     a = _cube()                        # extent [-0.5, 0.5]
     b = _cube(center=(0.5, 0.5, 0.5))  # extent [0, 1]
     blocks = tfpv.domains(tfpv.csg_graph([a, b]))
-    hit = tfpv.pick(blocks, [5.0, 0.25, 0.25], [-1.0, 0.0, 0.0])
+    hit = tfpv.pick(blocks, _ray([5.0, 0.25, 0.25], [-1.0, 0.0, 0.0]))
     # first surface on the way: b's +x face at x = 1, on the B-only domain
     expected = next(k for k in range(blocks.n_blocks)
                     if blocks[k].bounds[1] == 1.0)
@@ -671,16 +701,16 @@ def test_pick_names_the_domain_block():
         np.asarray(hit.block.points)[hit.block.regular_faces[hit.face], 0],
         [1.0, 1.0, 1.0])
 
-    assert tfpv.pick(blocks, [5.0, 0.25, 0.25], [1.0, 0.0, 0.0]) is None
+    assert tfpv.pick(blocks, _ray([5.0, 0.25, 0.25], [1.0, 0.0, 0.0])) is None
 
 
 def test_pick_nested_multiblock_flat_indexing():
     a = _cube()
     b = _cube(center=(0.5, 0.5, 0.5))
     blocks = tfpv.domains(tfpv.csg_graph([a, b]))
-    origin, direction = [5.0, 0.25, 0.25], [-1.0, 0.0, 0.0]
-    flat = tfpv.pick(blocks, origin, direction)
-    nested = tfpv.pick(pv.MultiBlock([blocks]), origin, direction)
+    ray = _ray([5.0, 0.25, 0.25], [-1.0, 0.0, 0.0])
+    flat = tfpv.pick(blocks, ray)
+    nested = tfpv.pick(pv.MultiBlock([blocks]), ray)
     assert nested.block_index == flat.block_index
     assert nested.face == flat.face
     assert nested.t == flat.t
@@ -689,7 +719,7 @@ def test_pick_nested_multiblock_flat_indexing():
 
 def test_pick_plain_polydata_target():
     cube = _cube(center=(3.0, 0.0, 0.0))
-    hit = tfpv.pick(cube, [0.0, 0.0, 0.0], [1.0, 0.0, 0.0])
+    hit = tfpv.pick(cube, _ray([0.0, 0.0, 0.0], [1.0, 0.0, 0.0]))
     assert hit.block_index == 0
     assert hit.block is cube
     assert hit.t == 2.5
@@ -700,7 +730,7 @@ def test_pick_skips_none_blocks_and_keeps_their_numbers():
     blocks = pv.MultiBlock()
     blocks.append(None)
     blocks.append(_cube(center=(3.0, 0.0, 0.0)))
-    hit = tfpv.pick(blocks, [0.0, 0.0, 0.0], [1.0, 0.0, 0.0])
+    hit = tfpv.pick(blocks, _ray([0.0, 0.0, 0.0], [1.0, 0.0, 0.0]))
     assert hit.block_index == 1
     assert hit.t == 2.5
 
@@ -708,9 +738,18 @@ def test_pick_skips_none_blocks_and_keeps_their_numbers():
 def test_pick_refuses_non_polydata_block():
     blocks = pv.MultiBlock([_cube(), pv.ImageData()])
     with pytest.raises(TypeError, match="block 1 must be"):
-        tfpv.pick(blocks, [0.0, 0.0, 0.0], [1.0, 0.0, 0.0])
+        tfpv.pick(blocks, _ray([0.0, 0.0, 0.0], [1.0, 0.0, 0.0]))
     with pytest.raises(TypeError, match="target must be"):
-        tfpv.pick(42, [0.0, 0.0, 0.0], [1.0, 0.0, 0.0])
+        tfpv.pick(42, _ray([0.0, 0.0, 0.0], [1.0, 0.0, 0.0]))
+
+
+def test_pick_refuses_batch_and_non_ray():
+    with pytest.raises(TypeError, match="trueform.Ray"):
+        tfpv.pick(_cube(), [0.0, 0.0, 0.0])
+    batch = _ray([[0.0, 0.0, 0.0], [0.0, 0.0, 1.0]],
+                 [[1.0, 0.0, 0.0], [1.0, 0.0, 0.0]])
+    with pytest.raises(ValueError, match="single ray"):
+        tfpv.pick(_cube(), batch)
 
 
 def test_closest_point_query_names_the_block():
