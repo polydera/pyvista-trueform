@@ -8,9 +8,11 @@ https://github.com/polydera/pyvista-trueform
 """
 
 import gc
+import importlib.util
 import math
 import subprocess
 import sys
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -888,6 +890,49 @@ def test_tube_refuses_non_line_input():
         tfpv.tube(_cube(), radius=0.1)
     with pytest.raises(TypeError):
         tfpv.tube(object(), radius=0.1)
+
+
+# -- examples ------------------------------------------------------------
+
+
+EXAMPLES_DIR = Path(__file__).resolve().parent.parent / "examples"
+
+
+def _example(name):
+    """Import an example module by file; its plotting stays behind main()."""
+    spec = importlib.util.spec_from_file_location(
+        name, EXAMPLES_DIR / f"{name}.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_examples_compute():
+    union, difference, blocks, hit = _example("booleans_and_picking").compute()
+    assert union.n_cells > 0 and difference.n_cells > 0
+    assert blocks.n_blocks >= 3
+    assert hit is not None and 0 <= hit.block_index < blocks.n_blocks
+
+    chunks = _example("csg_fracture").compute()
+    assert chunks.n_blocks == 27  # 2 cuts per axis -> 3**3 chunks
+
+    bands, contours = _example("isobands").compute()
+    assert bands.n_cells > 0
+    assert len(np.unique(bands.cell_data["trueform_labels"])) == 7
+    assert contours.GetNumberOfLines() > 0
+
+    source, remeshed, decimated, simplified = \
+        _example("remesh_and_simplify").compute()
+    assert remeshed.trueform.is_closed()
+    assert 0 < decimated.n_cells <= 0.3 * source.n_cells
+    assert 0 < simplified.n_cells < source.n_cells
+
+    _, _, _, before, after = _example("alignment").compute()
+    assert after < 1e-3 < before
+
+    depth = _example("raycast_depth").compute(resolution=64)
+    assert depth.shape == (64, 64)
+    assert (~np.isnan(depth)).sum() > 0
 
 
 # -- packaging -----------------------------------------------------------

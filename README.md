@@ -126,6 +126,23 @@ one-way chamfer measure.
 unordered 2-point segments are connected into polylines first — or around
 the `(paths, points)` pair any trueform curve producer returns.
 
+### Examples
+
+Six standalone scripts in `examples/`, each with an importable
+`compute()` and a plotting `main()` (`python examples/<name>.py`):
+
+- `booleans_and_picking.py` — union and difference with labels, domains,
+  and ray picking that names the block.
+- `csg_fracture.py` — a sphere minus a grid of cutters through one
+  csg_graph expression, read back as volumetric chunks.
+- `isobands.py` — height isobands and isocontours overlaid on a surface.
+- `remesh_and_simplify.py` — remeshed, decimated, and simplified side by
+  side.
+- `alignment.py` — a transformed copy registered back with `align`,
+  chamfer distance before and after.
+- `raycast_depth.py` — an orthographic depth image from one batched
+  `tf.Ray` cast.
+
 ### Coming with trueform 0.11
 
 `euler_characteristic`, `signed_distance`, orientation verdicts
