@@ -513,18 +513,20 @@ def test_csg_graph_end_to_end():
     b = _cube(center=(0.5, 0.0, 0.0))
     c = _cube(center=(0.25, 0.5, 0.0))
     graph = tfpv.csg_graph([a, b, c])
-    assert isinstance(graph, tf.CsgGraph)
+    assert isinstance(graph, tfpv.CsgGraph)
 
-    difference = tfpv.to_pyvista(graph.mesh(tf.op(0) - tf.op(1)))
+    difference = graph.mesh(tf.op(0) - tf.op(1))
+    assert isinstance(difference, pv.PolyData)
     assert difference.n_cells > 0
     assert difference.trueform.is_closed()
     assert difference.volume == pytest.approx(0.5, rel=1e-4)
 
-    union = tfpv.to_pyvista(graph.mesh(tf.op(0) | tf.op(1) | tf.op(2)))
+    union = graph.mesh(tf.op(0) | tf.op(1) | tf.op(2))
+    assert isinstance(union, pv.PolyData)
     assert union.trueform.is_closed()
     assert union.volume > 1.5
 
-    full = tfpv.to_pyvista(graph.mesh())
+    full = graph.mesh()
     assert full.n_cells >= union.n_cells
 
 
@@ -532,8 +534,26 @@ def test_csg_graph_operands_reuse_accessor_cache():
     a = _cube()
     b = _cube(center=(0.5, 0.5, 0.5))
     graph = tfpv.csg_graph([a, b])
-    assert graph.forms[0] is a.trueform.to_mesh()
-    assert graph.forms[1] is b.trueform.to_mesh()
+    assert graph.native.forms[0] is a.trueform.to_mesh()
+    assert graph.native.forms[1] is b.trueform.to_mesh()
+
+
+def test_csg_graph_readers_answer_in_pyvista_types():
+    a = _cube()
+    b = _cube(center=(0.5, 0.5, 0.5))
+    graph = tfpv.csg_graph([a, b])
+
+    blocks = graph.domains()
+    assert isinstance(blocks, pv.MultiBlock)
+    module_blocks = tfpv.domains(graph)
+    assert blocks.keys() == module_blocks.keys()
+    assert [block.n_cells for block in blocks] == [
+        block.n_cells for block in module_blocks]
+
+    curves = graph.intersection_curves()
+    assert isinstance(curves, pv.PolyData)
+    assert curves.GetNumberOfLines() > 0
+    assert curves.GetNumberOfPolys() == 0
 
 
 # -- arrangements and domains --------------------------------------------
@@ -569,14 +589,15 @@ def test_domains_of_two_cubes():
     core = tfpv.domains(graph, tf.op(0) & tf.op(1))
     assert core.n_blocks == 1
     assert core[0].volume == pytest.approx(0.125, rel=1e-4)
-    assert core.keys()[0] == str(graph.domains(tf.op(0) & tf.op(1))[1][0])
+    assert core.keys()[0] == str(
+        graph.native.domains(tf.op(0) & tf.op(1))[1][0])
 
 
 def test_domains_block_names_are_domain_ids():
     a = _cube()
     b = _cube(center=(0.5, 0.5, 0.5))
     graph = tfpv.csg_graph([a, b])
-    cells, ids = graph.domains()
+    cells, ids = graph.native.domains()
     assert tfpv.domains(graph).keys() == [str(domain_id) for domain_id in ids]
 
     blocks = tfpv.domains_to_pyvista(cells, ids)  # zero-copy assembly

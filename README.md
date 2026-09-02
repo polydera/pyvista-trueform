@@ -41,11 +41,16 @@ expressions against it:
 
 ```python
 import trueform as tf
-from pyvista_trueform import csg_graph, to_pyvista
+from pyvista_trueform import csg_graph
 
 graph = csg_graph([a, b, c])
-to_pyvista(graph.mesh(tf.op(0) - (tf.op(1) | tf.op(2)))).plot()
+graph.mesh(tf.op(0) - (tf.op(1) | tf.op(2))).plot()
 ```
+
+`graph.mesh(...)`, `graph.domains()`, and `graph.intersection_curves()`
+answer directly in PyVista types; the rest of the graph's surface
+(`created_points`, `forms`, the construction state) lives on
+`graph.native`, the underlying `trueform.CsgGraph`.
 
 ### Conversions
 
