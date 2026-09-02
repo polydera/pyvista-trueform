@@ -603,6 +603,12 @@ def test_csg_graph_end_to_end():
     assert full.n_cells >= union.n_cells
 
 
+def test_csg_graph_refuses_quads_with_pyvista_wording():
+    quads = pv.Plane(i_resolution=2, j_resolution=2)
+    with pytest.raises(ValueError, match=r"\.triangulate\(\)"):
+        tfpv.csg_graph([quads, _cube()])
+
+
 def test_csg_graph_operands_reuse_accessor_cache():
     a = _cube()
     b = _cube(center=(0.5, 0.5, 0.5))

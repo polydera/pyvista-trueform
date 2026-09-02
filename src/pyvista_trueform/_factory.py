@@ -7,6 +7,7 @@ Commercial licensing available via info@polydera.com.
 https://github.com/polydera/pyvista-trueform
 """
 
+import pyvista as pv
 import trueform as tf
 
 from ._accessor import _operand_mesh
@@ -121,6 +122,11 @@ def csg_graph(datasets, **kwargs):
     -------
     CsgGraph
     """
+    for i, dataset in enumerate(datasets):
+        if isinstance(dataset, pv.PolyData) and not dataset.is_all_triangles:
+            raise ValueError(
+                f"operand {i} is not all triangles; "
+                "call .triangulate() on it first")
     return CsgGraph(tf.CsgGraph(
         [_operand_mesh(dataset) for dataset in datasets], **kwargs))
 
