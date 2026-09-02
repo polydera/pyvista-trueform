@@ -439,6 +439,47 @@ def test_accessor_closest_point_on_corner():
             == cube.find_closest_point([0.5, 0.5, 0.5])).any()
 
 
+def test_accessor_closest_point_pair_between_meshes():
+    a = _cube()
+    far = _cube(center=(3.0, 0.0, 0.0))  # gap from x=0.5 to x=2.5
+    (face_a, face_far), (distance, point_a, point_far) = \
+        a.trueform.closest_point_pair(far)
+    assert distance == 2.0
+    assert point_a[0] == 0.5
+    assert point_far[0] == 2.5
+    np.testing.assert_array_equal(point_a[1:], point_far[1:])
+    np.testing.assert_array_equal(
+        np.asarray(a.points)[a.regular_faces[face_a], 0], [0.5, 0.5, 0.5])
+    np.testing.assert_array_equal(
+        np.asarray(far.points)[far.regular_faces[face_far], 0],
+        [2.5, 2.5, 2.5])
+
+    mesh_pair = a.trueform.closest_point_pair(far.trueform.to_mesh())
+    assert mesh_pair[1][0] == 2.0
+
+
+def test_accessor_closest_point_pair_with_bare_points():
+    cube = _cube()
+    operand = pv.PolyData(np.array(
+        [[2.5, 0.0, 0.0], [5.0, 5.0, 5.0], [-3.0, 0.0, 0.0]],
+        dtype=np.float32))
+    assert operand.GetNumberOfPolys() == 0
+    (face, point_id), (distance, point, other_point) = \
+        cube.trueform.closest_point_pair(operand)
+    assert point_id == 0
+    assert distance == 2.0
+    np.testing.assert_array_equal(point, [0.5, 0.0, 0.0])
+    np.testing.assert_array_equal(other_point, [2.5, 0.0, 0.0])
+    np.testing.assert_array_equal(
+        np.asarray(cube.points)[cube.regular_faces[face], 0],
+        [0.5, 0.5, 0.5])
+
+
+def test_accessor_closest_point_pair_refuses_pointless_operand():
+    with pytest.raises(TypeError, match="operand must be"):
+        _cube().trueform.closest_point_pair(pv.MultiBlock())
+
+
 def test_accessor_curvatures_and_shape_index():
     sphere = pv.Sphere()  # radius 0.5, curvature 1/r = 2
     k0, k1 = sphere.trueform.principal_curvatures()

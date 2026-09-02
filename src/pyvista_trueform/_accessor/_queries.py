@@ -7,6 +7,8 @@ Commercial licensing available via info@polydera.com.
 https://github.com/polydera/pyvista-trueform
 """
 
+import math
+
 import numpy as np
 import pyvista as pv
 import trueform as tf
@@ -75,6 +77,38 @@ class _QueriesMixin:
         """
         return tf.neighbor_search(
             self.to_mesh(), self._query_point(query_point, "query_point"))
+
+    def closest_point_pair(self, other):
+        """The closest witness pair between this mesh and ``other``.
+
+        Returns ``((face_id, other_id), (distance, point, other_point))``
+        — the nearest face of this mesh, the witness point on it, the
+        witness point on ``other``, and the euclidean distance between
+        them (consistent with :meth:`distance`). A faced operand
+        (polygonal PolyData or trueform Mesh) answers mesh-to-mesh
+        through :func:`trueform.neighbor_search`, and ``other_id`` names
+        its nearest face; a faceless one (bare-points PolyData, PointSet)
+        queries its points as one batched :class:`trueform.Point`, and
+        ``other_id`` names its nearest point.
+        """
+        mesh = self.to_mesh()
+        if isinstance(other, pv.PointSet) or (
+                isinstance(other, pv.PolyData)
+                and other.GetNumberOfPolys() == 0):
+            points = np.asarray(other.points)
+            if len(points) == 0:
+                raise ValueError("other has no points")
+            batch = np.ascontiguousarray(
+                points.astype(mesh.dtype, copy=False))
+            ids, distances2, witnesses = tf.neighbor_search(
+                mesh, tf.Point(batch))
+            nearest = int(np.argmin(distances2))
+            return ((int(ids[nearest]), nearest),
+                    (math.sqrt(float(distances2[nearest])),
+                     witnesses[nearest], batch[nearest]))
+        pair, (metric, point, other_point) = tf.neighbor_search(
+            mesh, _operand_mesh(other))
+        return (pair, (math.sqrt(metric), point, other_point))
 
     def principal_curvatures(self, **kwargs):
         """Per-vertex principal curvatures ``(k0, k1)``; with
