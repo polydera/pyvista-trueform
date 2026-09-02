@@ -33,7 +33,18 @@ Developed jointly by Žiga Sajovic and Claude.
    feature loss: a dependency floor is a feature floor (the pyvista floor
    is the version whose accessor registry this package registers into).
 
-5. **Every claim is a fixture.** Cache identity (`is`), the raw-mutation
+5. **The package speaks two dialects, one per direction.** Inward,
+   queries speak trueform primitives: `ray_cast` and `pick` take a
+   `tf.Ray` (single or batch), a point query is an array or a batched
+   `tf.Point` — a points-only PyVista dataset wraps its `.points` as one
+   batched primitive, never a refusal, never a second path. Outward,
+   readers answer in PyVista types: `PolyData` with labels as cell data,
+   `MultiBlock` for anything plural, line PolyData for curves — the
+   `CsgGraph` wrapper exists for exactly this, with `.native` as the one
+   escape hatch. And every value this package names "distance" is
+   euclidean; a squared metric is converted at the boundary, once.
+
+6. **Every claim is a fixture.** Cache identity (`is`), the raw-mutation
    MTime gotcha, zero-copy owner-safety under `gc`, entry-point
    registration in a clean subprocess — each documented behavior has the
    test that proves it, in `tests/test_pyvista_trueform.py`.
