@@ -10,6 +10,12 @@ https://github.com/polydera/pyvista-trueform
 
 # Importing _accessor registers the .trueform accessor on pyvista.PolyData.
 # Installed wheels also reach it through PyVista's lazy accessor entry point.
+try:
+    from importlib.metadata import version as _distribution_version
+    __version__ = _distribution_version("pyvista-trueform")
+except Exception:
+    __version__ = "0.0.0"
+
 from ._accessor import TrueformAccessor
 from ._conversion import (curves_to_pyvista, domains_to_pyvista,
                           to_pyvista, to_trueform)
@@ -20,6 +26,7 @@ from ._registration import align, chamfer_distance
 from ._tube import tube
 
 __all__ = [
+    "__version__",
     "ClosestHit",
     "CsgGraph",
     "RayHit",
