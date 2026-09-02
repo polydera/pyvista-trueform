@@ -359,6 +359,48 @@ def test_accessor_diagnostics():
     assert plane.trueform.is_manifold()
 
 
+# -- io ------------------------------------------------------------------
+
+
+def test_io_round_trip_stl(tmp_path):
+    cube = _cube()
+    path = tmp_path / "cube.stl"
+    tfpv.write(path, cube)
+
+    back = tfpv.read(path)
+    assert back.n_cells == 12
+    # STL stores bare triangles; trueform welds duplicates on read, so the
+    # cube's 8 corners come back exactly, in some order.
+    assert back.n_points == 8
+    np.testing.assert_array_equal(
+        np.sort(np.asarray(back.points), axis=0),
+        np.sort(np.asarray(cube.points), axis=0))
+    assert back.volume == pytest.approx(1.0)
+    assert back.trueform.is_closed()
+
+
+def test_io_round_trip_obj(tmp_path):
+    grid = pv.Plane(i_resolution=2, j_resolution=2)  # quads survive OBJ
+    path = tmp_path / "grid.obj"
+    tfpv.write(path, grid)
+
+    back = tfpv.read(path)
+    assert back.n_cells == 4
+    assert back.n_points == 9
+    np.testing.assert_array_equal(
+        np.asarray(back.points), np.asarray(grid.points))
+    np.testing.assert_array_equal(
+        vtk_to_numpy(back.GetPolys().GetConnectivityArray()),
+        vtk_to_numpy(grid.GetPolys().GetConnectivityArray()))
+
+
+def test_io_refuses_unknown_suffix(tmp_path):
+    with pytest.raises(ValueError, match=r"\.ply"):
+        tfpv.read(tmp_path / "mesh.ply")
+    with pytest.raises(ValueError, match=r"\.ply"):
+        tfpv.write(tmp_path / "mesh.ply", _cube())
+
+
 # -- the N-ary factory ---------------------------------------------------
 
 

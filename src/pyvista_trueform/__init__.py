@@ -13,11 +13,14 @@ https://github.com/polydera/pyvista-trueform
 from ._accessor import TrueformAccessor
 from ._conversion import curves_to_pyvista, to_pyvista, to_trueform
 from ._factory import csg_graph
+from ._io import read, write
 
 __all__ = [
     "TrueformAccessor",
     "csg_graph",
     "curves_to_pyvista",
+    "read",
     "to_pyvista",
     "to_trueform",
+    "write",
 ]
