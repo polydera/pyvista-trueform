@@ -398,6 +398,71 @@ def test_accessor_remesh_region_labels_ride():
     assert set(np.unique(labels)) == {0, 1}
 
 
+# -- queries and measurements --------------------------------------------
+
+
+def test_accessor_measurements_exact():
+    cube = _cube()
+    assert cube.trueform.volume() == 1.0
+    assert cube.trueform.area() == 6.0
+
+
+def test_accessor_ray_cast_known_hit():
+    cube = _cube(center=(3.0, 0.0, 0.0))  # near face at x = 2.5
+    face_id, t = cube.trueform.ray_cast([0.0, 0.0, 0.0], [1.0, 0.0, 0.0])
+    assert t == 2.5
+    hit_face = cube.regular_faces[face_id]
+    np.testing.assert_array_equal(np.asarray(cube.points)[hit_face, 0],
+                                  [2.5, 2.5, 2.5])
+    assert cube.trueform.ray_cast([0.0, 0.0, 5.0], [1.0, 0.0, 0.0]) is None
+
+
+def test_accessor_distance_and_intersects():
+    a = _cube()
+    far = _cube(center=(3.0, 0.0, 0.0))  # gap from x=0.5 to x=2.5
+    assert a.trueform.distance(far) == 2.0
+    assert not a.trueform.intersects(far)
+
+    near = _cube(center=(0.5, 0.5, 0.5))
+    assert a.trueform.distance(near) == 0.0
+    assert a.trueform.intersects(near)
+
+    assert a.trueform.distance([2.5, 0.0, 0.0]) == 2.0
+
+
+def test_accessor_closest_point_on_corner():
+    cube = _cube()
+    face_id, distance2, point = cube.trueform.closest_point([2.0, 2.0, 2.0])
+    assert distance2 == 6.75  # 3 * 1.5**2 to the (0.5, 0.5, 0.5) corner
+    np.testing.assert_array_equal(point, [0.5, 0.5, 0.5])
+    assert (cube.regular_faces[face_id]
+            == cube.find_closest_point([0.5, 0.5, 0.5])).any()
+
+
+def test_accessor_curvatures_and_shape_index():
+    sphere = pv.Sphere()  # radius 0.5, curvature 1/r = 2
+    k0, k1 = sphere.trueform.principal_curvatures()
+    assert k0.shape == (sphere.n_points,)
+    assert 1.5 < k0.mean() < 2.5
+    assert 1.5 < k1.mean() < 2.5
+
+    shape_index = sphere.trueform.shape_index()  # spherical cap = +1
+    assert shape_index.shape == (sphere.n_points,)
+    assert shape_index.mean() > 0.9
+
+
+def test_accessor_boundary_curves_of_plane():
+    plane = pv.Plane(i_resolution=1, j_resolution=1).triangulate()
+    curves = plane.trueform.boundary_curves()
+    assert curves.GetNumberOfLines() == 1
+    assert curves.n_points == 4
+
+    path = vtk_to_numpy(curves.GetLines().GetConnectivityArray())
+    assert path[0] == path[-1]  # one closed loop
+    steps = np.diff(np.asarray(curves.points)[path], axis=0)
+    assert np.linalg.norm(steps, axis=1).sum() == 4.0  # unit-square rim
+
+
 # -- io ------------------------------------------------------------------
 
 

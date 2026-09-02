@@ -7,10 +7,21 @@ Commercial licensing available via info@polydera.com.
 https://github.com/polydera/pyvista-trueform
 """
 
+import numpy as np
+import pyvista as pv
 import trueform as tf
+
+from .._conversion import curves_to_pyvista
+from . import _operand_mesh
 
 
 class _QueriesMixin:
+
+    def _query_point(self, point, name):
+        point = np.asarray(point, dtype=self.to_mesh().dtype)
+        if point.shape != (3,):
+            raise ValueError(f"{name} must have shape (3,), got {point.shape}")
+        return point
 
     def is_closed(self):
         """True when every edge is shared by exactly two faces (watertight)."""
@@ -19,3 +30,68 @@ class _QueriesMixin:
     def is_manifold(self):
         """True when no edge is shared by more than two faces."""
         return tf.is_manifold(self.to_mesh())
+
+    def area(self):
+        """Total surface area. See :func:`trueform.area`."""
+        return tf.area(self.to_mesh())
+
+    def volume(self):
+        """Enclosed volume of a closed mesh. See :func:`trueform.volume`."""
+        return tf.volume(self.to_mesh())
+
+    def ray_cast(self, origin, direction):
+        """First mesh face hit by the ray, through the cached spatial tree.
+
+        Returns ``(face_id, t)`` with ``hit = origin + t * direction``, or
+        ``None`` when the ray misses. See :func:`trueform.ray_cast`.
+        """
+        ray = tf.Ray(origin=self._query_point(origin, "origin"),
+                     direction=self._query_point(direction, "direction"))
+        return tf.ray_cast(ray, self.to_mesh())
+
+    def distance(self, other):
+        """Euclidean distance to ``other``.
+
+        ``other`` is a PolyData, a trueform Mesh, or a ``(3,)`` point.
+        See :func:`trueform.distance`.
+        """
+        if isinstance(other, (tf.Mesh, pv.PolyData)):
+            return tf.distance(self.to_mesh(), _operand_mesh(other))
+        return tf.distance(self.to_mesh(),
+                           tf.Point(self._query_point(other, "other")))
+
+    def intersects(self, other):
+        """True when this mesh intersects ``other`` (PolyData or trueform
+        Mesh). See :func:`trueform.intersects`.
+        """
+        return tf.intersects(self.to_mesh(), _operand_mesh(other))
+
+    def closest_point(self, query_point):
+        """The mesh point closest to ``query_point``.
+
+        Returns ``(face_id, distance_squared, point)`` — the nearest face,
+        the squared distance, and the closest point on the mesh. See
+        :func:`trueform.neighbor_search`.
+        """
+        return tf.neighbor_search(
+            self.to_mesh(), self._query_point(query_point, "query_point"))
+
+    def principal_curvatures(self, **kwargs):
+        """Per-vertex principal curvatures ``(k0, k1)``; with
+        ``directions=True`` also ``(d0, d1)``. See
+        :func:`trueform.principal_curvatures` for keyword arguments.
+        """
+        return tf.principal_curvatures(self.to_mesh(), **kwargs)
+
+    def shape_index(self, **kwargs):
+        """Per-vertex shape index in ``[-1, 1]`` (cup to cap). See
+        :func:`trueform.shape_index` for keyword arguments.
+        """
+        return tf.shape_index(self.to_mesh(), **kwargs)
+
+    def boundary_curves(self):
+        """The mesh's boundary loops as a line-only PolyData.
+
+        See :func:`trueform.boundary_curves`.
+        """
+        return curves_to_pyvista(tf.boundary_curves(self.to_mesh()))
