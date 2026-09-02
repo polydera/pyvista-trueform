@@ -12,9 +12,11 @@ https://github.com/polydera/pyvista-trueform
 # Installed wheels also reach it through PyVista's lazy accessor entry point.
 from ._accessor import TrueformAccessor
 from ._conversion import curves_to_pyvista, to_pyvista, to_trueform
+from ._factory import csg_graph
 
 __all__ = [
     "TrueformAccessor",
+    "csg_graph",
     "curves_to_pyvista",
     "to_pyvista",
     "to_trueform",

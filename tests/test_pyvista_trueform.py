@@ -359,6 +359,37 @@ def test_accessor_diagnostics():
     assert plane.trueform.is_manifold()
 
 
+# -- the N-ary factory ---------------------------------------------------
+
+
+def test_csg_graph_end_to_end():
+    a = _cube()
+    b = _cube(center=(0.5, 0.0, 0.0))
+    c = _cube(center=(0.25, 0.5, 0.0))
+    graph = tfpv.csg_graph([a, b, c])
+    assert isinstance(graph, tf.CsgGraph)
+
+    difference = tfpv.to_pyvista(graph.mesh(tf.op(0) - tf.op(1)))
+    assert difference.n_cells > 0
+    assert difference.trueform.is_closed()
+    assert difference.volume == pytest.approx(0.5, rel=1e-4)
+
+    union = tfpv.to_pyvista(graph.mesh(tf.op(0) | tf.op(1) | tf.op(2)))
+    assert union.trueform.is_closed()
+    assert union.volume > 1.5
+
+    full = tfpv.to_pyvista(graph.mesh())
+    assert full.n_cells >= union.n_cells
+
+
+def test_csg_graph_operands_reuse_accessor_cache():
+    a = _cube()
+    b = _cube(center=(0.5, 0.5, 0.5))
+    graph = tfpv.csg_graph([a, b])
+    assert graph.forms[0] is a.trueform.to_mesh()
+    assert graph.forms[1] is b.trueform.to_mesh()
+
+
 # -- packaging -----------------------------------------------------------
 
 
