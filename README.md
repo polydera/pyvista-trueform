@@ -76,6 +76,25 @@ domain id — pass a prebuilt `csg_graph(...)` and an expression to restrict
 it. `tfpv.mesh_arrangements([a, b, c])` returns the whole arrangement as one
 labeled PolyData instead.
 
+### Picking
+
+`pick` and `closest` answer over any MultiBlock (nested ones flatten;
+plain PolyData works too, as block 0) — not just domains — and name WHICH
+block:
+
+```python
+from pyvista_trueform import csg_graph, domains, pick
+
+blocks = domains(csg_graph([a, b]))
+hit = pick(blocks, origin, direction)
+# you picked block hit.block_index at hit.point
+```
+
+`closest(blocks, query)` does the same by proximity: the query is a point
+or a whole dataset/mesh (mesh-to-mesh through the witness-pair entry
+`.trueform.closest_point_pair(other)`), and the hit carries the witness
+point on the winning block and the euclidean distance.
+
 ### Remesh
 
 `mesh.trueform.remeshed(target_length)`, `.decimated(proportion)`, and
@@ -87,8 +106,9 @@ quadric-error tiers — boundary-, feature- and region-aware
 
 `mesh.trueform.volume()`, `.area()`, `.ray_cast(origin, direction)`,
 `.distance(other)`, `.intersects(other)`, `.closest_point(point)`,
-`.principal_curvatures()`, `.shape_index()`, and `.boundary_curves()` answer
-against the cached mesh, so the spatial tree amortizes across calls.
+`.closest_point_pair(other)`, `.principal_curvatures()`, `.shape_index()`,
+and `.boundary_curves()` answer against the cached mesh, so the spatial
+tree amortizes across calls.
 
 ### Registration
 
