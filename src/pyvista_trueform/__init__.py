@@ -8,9 +8,13 @@ Commercial licensing available via info@polydera.com.
 https://github.com/polydera/pyvista-trueform
 """
 
+# Importing _accessor registers the .trueform accessor on pyvista.PolyData.
+# Installed wheels also reach it through PyVista's lazy accessor entry point.
+from ._accessor import TrueformAccessor
 from ._conversion import curves_to_pyvista, to_pyvista, to_trueform
 
 __all__ = [
+    "TrueformAccessor",
     "curves_to_pyvista",
     "to_pyvista",
     "to_trueform",
