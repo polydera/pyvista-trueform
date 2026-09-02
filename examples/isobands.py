@@ -45,8 +45,7 @@ def main():
         bands = hills.trueform.isobands("height", cuts)
         contours = hills.trueform.isocontours("height", cuts)
         plotter.add_mesh(bands, name="bands", scalars="trueform_labels",
-                         cmap=_theme.polydera_cmap(
-                             bands.cell_data["trueform_labels"]),
+                         cmap=_theme.polydera_bands(n),
                          show_scalar_bar=False)
         plotter.add_mesh(contours, name="contours", color=_theme.LIGHT,
                          line_width=5, render_lines_as_tubes=True)

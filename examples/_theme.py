@@ -77,6 +77,19 @@ def polydera_div():
     return _waypoint_cmap("polydera_div", DIV_WAYPOINTS)
 
 
+def polydera_bands(n, floor=0.15):
+    """``n`` sequential band colors, starting visibly above the page ground.
+
+    The sequential map's first waypoint nearly matches the background, so a
+    band colored at t=0 reads as a hole in the surface; the floor keeps the
+    lowest band on the page.
+    """
+    import numpy as np
+    from matplotlib.colors import ListedColormap
+
+    return ListedColormap(polydera_seq()(np.linspace(floor, 1.0, n)))
+
+
 def polydera_cmap(values):
     """Diverging when ``values`` cross zero, sequential otherwise."""
     import numpy as np
