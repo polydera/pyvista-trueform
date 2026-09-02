@@ -359,6 +359,45 @@ def test_accessor_diagnostics():
     assert plane.trueform.is_manifold()
 
 
+# -- remesh --------------------------------------------------------------
+
+
+def test_accessor_remeshed():
+    sphere = pv.Sphere()
+    target = 2.0 * tf.mean_edge_length(sphere.trueform.to_mesh())
+
+    remeshed = sphere.trueform.remeshed(target)
+    result_length = tf.mean_edge_length(remeshed.trueform.to_mesh())
+    assert 0.5 * target < result_length < 1.5 * target
+    assert remeshed.trueform.is_closed()
+
+
+def test_accessor_decimated():
+    sphere = pv.Sphere()
+    decimated = sphere.trueform.decimated(0.3)
+    assert 0 < decimated.n_cells <= 0.3 * sphere.n_cells
+    assert decimated.trueform.is_closed()
+
+
+def test_accessor_simplified():
+    sphere = pv.Sphere()
+    simplified = sphere.trueform.simplified()
+    assert 0 < simplified.n_cells < sphere.n_cells
+    assert simplified.trueform.is_closed()
+
+
+def test_accessor_remesh_region_labels_ride():
+    sphere = pv.Sphere()
+    regions = (np.asarray(sphere.points)[sphere.regular_faces[:, 0], 2]
+               > 0).astype(np.int32)
+    remeshed = sphere.trueform.remeshed(
+        2.0 * tf.mean_edge_length(sphere.trueform.to_mesh()),
+        preserve_regions=regions)
+    labels = remeshed.cell_data["trueform_labels"]
+    assert len(labels) == remeshed.n_cells
+    assert set(np.unique(labels)) == {0, 1}
+
+
 # -- io ------------------------------------------------------------------
 
 

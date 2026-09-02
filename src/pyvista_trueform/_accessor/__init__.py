@@ -31,11 +31,12 @@ from ._booleans import _BooleansMixin
 from ._curves import _CurvesMixin
 from ._iso import _IsoMixin
 from ._queries import _QueriesMixin
+from ._remesh import _RemeshMixin
 from ._repair import _RepairMixin
 
 
 class TrueformAccessor(_BooleansMixin, _CurvesMixin, _IsoMixin, _RepairMixin,
-                       _QueriesMixin):
+                       _RemeshMixin, _QueriesMixin):
     """trueform operations exposed as ``polydata.trueform.<method>(...)``.
 
     The accessor converts the dataset into a :class:`trueform.Mesh` once and
