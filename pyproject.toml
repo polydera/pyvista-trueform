@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pyvista-trueform"
+version = "0.1.0"
+description = "PyVista accessor for trueform: exact mesh booleans, arrangements, intersection curves, and scalar-field cuts."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { file = "LICENSE.noncommercial" }
+authors = [
+  { name = "Ziga Sajovic", email = "info@polydera.com" },
+  { name = "XLAB" },
+]
+keywords = [
+  "pyvista",
+  "mesh",
+  "geometry",
+  "mesh-boolean",
+  "csg",
+  "computational-geometry",
+]
+dependencies = [
+  "trueform>=0.10.0",
+  "pyvista>=0.43",
+  "numpy>=1.23",
+]
+
+[project.optional-dependencies]
+test = ["pytest"]
+
+[project.entry-points."pyvista.accessors"]
+trueform = "pyvista_trueform._accessor"
+
+[project.urls]
+Homepage = "https://trueform.polydera.com"
+Repository = "https://github.com/polydera/pyvista-trueform"
+Issues = "https://github.com/polydera/pyvista-trueform/issues"
+
+[tool.setuptools.packages.find]
+where = ["src"]
