@@ -5,7 +5,8 @@ A random-hills surface carries its own height as a per-vertex scalar
 field. The accessor recuts the mesh into height bands — every face split
 exactly at the cut values, the band of each output face riding as cell
 data — and extracts the isocontour curves at the same values, overlaid on
-the banded surface.
+the banded surface. A slider recuts live: the surface never changes, so
+the accessor's cached mesh is reused and every drag pays only the recut.
 
 Copyright (c) 2025 Žiga Sajovic, XLAB
 Licensed for noncommercial use under the PolyForm Noncommercial License 1.0.0.
@@ -30,14 +31,26 @@ def compute(n_bands=7):
 
 
 def main():
-    bands, contours = compute()
-    print(f"{bands.n_cells} band faces, "
-          f"{contours.GetNumberOfLines()} contour lines")
+    hills = pv.ParametricRandomHills()
+    height = np.asarray(hills.points)[:, 2].copy()
+    hills.point_data["height"] = height
+    lo, hi = float(height.min()), float(height.max())
+
     plotter = pv.Plotter()
-    plotter.add_mesh(bands, scalars="trueform_labels", cmap="terrain",
-                     show_scalar_bar=False)
-    plotter.add_mesh(contours, color="black", line_width=4,
-                     render_lines_as_tubes=True)
+
+    def recut(n_bands):
+        n = max(2, int(round(n_bands)))
+        cuts = np.linspace(lo, hi, n + 1)[1:-1]
+        bands = hills.trueform.isobands("height", cuts)
+        contours = hills.trueform.isocontours("height", cuts)
+        plotter.add_mesh(bands, name="bands", scalars="trueform_labels",
+                         cmap="terrain", show_scalar_bar=False)
+        plotter.add_mesh(contours, name="contours", color="black",
+                         line_width=4, render_lines_as_tubes=True)
+
+    recut(7)
+    plotter.add_slider_widget(recut, rng=[2, 15], value=7, title="bands",
+                              fmt="%.0f")
     plotter.show()
 
 

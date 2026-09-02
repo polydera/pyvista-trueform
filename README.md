@@ -135,7 +135,8 @@ Six standalone scripts in `examples/`, each with an importable
   and ray picking that names the block.
 - `csg_fracture.py` — a sphere minus a grid of cutters through one
   csg_graph expression, read back as volumetric chunks.
-- `isobands.py` — height isobands and isocontours overlaid on a surface.
+- `isobands.py` — height isobands and isocontours overlaid on a
+  surface, recut live from a band-count slider.
 - `remesh_and_simplify.py` — remeshed, decimated, and simplified side by
   side.
 - `alignment.py` — a transformed copy registered back with `align`,
