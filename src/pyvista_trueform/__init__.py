@@ -15,19 +15,24 @@ from ._conversion import (curves_to_pyvista, domains_to_pyvista,
                           to_pyvista, to_trueform)
 from ._factory import CsgGraph, csg_graph, domains, mesh_arrangements
 from ._io import read, write
+from ._pick import ClosestHit, RayHit, closest, pick
 from ._registration import align, chamfer_distance
 from ._tube import tube
 
 __all__ = [
+    "ClosestHit",
     "CsgGraph",
+    "RayHit",
     "TrueformAccessor",
     "align",
     "chamfer_distance",
+    "closest",
     "csg_graph",
     "curves_to_pyvista",
     "domains",
     "domains_to_pyvista",
     "mesh_arrangements",
+    "pick",
     "read",
     "to_pyvista",
     "to_trueform",

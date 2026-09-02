@@ -648,6 +648,109 @@ def test_domains_block_names_are_domain_ids():
         assert np.shares_memory(np.asarray(block.points), points)
 
 
+# -- picking -------------------------------------------------------------
+
+
+def _two_far_cubes_multiblock():
+    return pv.MultiBlock([_cube(), _cube(center=(3.0, 0.0, 0.0))])
+
+
+def test_pick_names_the_domain_block():
+    a = _cube()                        # extent [-0.5, 0.5]
+    b = _cube(center=(0.5, 0.5, 0.5))  # extent [0, 1]
+    blocks = tfpv.domains(tfpv.csg_graph([a, b]))
+    hit = tfpv.pick(blocks, [5.0, 0.25, 0.25], [-1.0, 0.0, 0.0])
+    # first surface on the way: b's +x face at x = 1, on the B-only domain
+    expected = next(k for k in range(blocks.n_blocks)
+                    if blocks[k].bounds[1] == 1.0)
+    assert hit.block_index == expected
+    assert hit.block is blocks[expected]
+    assert hit.t == 4.0
+    np.testing.assert_array_equal(hit.point, [1.0, 0.25, 0.25])
+    np.testing.assert_array_equal(
+        np.asarray(hit.block.points)[hit.block.regular_faces[hit.face], 0],
+        [1.0, 1.0, 1.0])
+
+    assert tfpv.pick(blocks, [5.0, 0.25, 0.25], [1.0, 0.0, 0.0]) is None
+
+
+def test_pick_nested_multiblock_flat_indexing():
+    a = _cube()
+    b = _cube(center=(0.5, 0.5, 0.5))
+    blocks = tfpv.domains(tfpv.csg_graph([a, b]))
+    origin, direction = [5.0, 0.25, 0.25], [-1.0, 0.0, 0.0]
+    flat = tfpv.pick(blocks, origin, direction)
+    nested = tfpv.pick(pv.MultiBlock([blocks]), origin, direction)
+    assert nested.block_index == flat.block_index
+    assert nested.face == flat.face
+    assert nested.t == flat.t
+    np.testing.assert_array_equal(nested.point, flat.point)
+
+
+def test_pick_plain_polydata_target():
+    cube = _cube(center=(3.0, 0.0, 0.0))
+    hit = tfpv.pick(cube, [0.0, 0.0, 0.0], [1.0, 0.0, 0.0])
+    assert hit.block_index == 0
+    assert hit.block is cube
+    assert hit.t == 2.5
+    np.testing.assert_array_equal(hit.point, [2.5, 0.0, 0.0])
+
+
+def test_pick_skips_none_blocks_and_keeps_their_numbers():
+    blocks = pv.MultiBlock()
+    blocks.append(None)
+    blocks.append(_cube(center=(3.0, 0.0, 0.0)))
+    hit = tfpv.pick(blocks, [0.0, 0.0, 0.0], [1.0, 0.0, 0.0])
+    assert hit.block_index == 1
+    assert hit.t == 2.5
+
+
+def test_pick_refuses_non_polydata_block():
+    blocks = pv.MultiBlock([_cube(), pv.ImageData()])
+    with pytest.raises(TypeError, match="block 1 must be"):
+        tfpv.pick(blocks, [0.0, 0.0, 0.0], [1.0, 0.0, 0.0])
+    with pytest.raises(TypeError, match="target must be"):
+        tfpv.pick(42, [0.0, 0.0, 0.0], [1.0, 0.0, 0.0])
+
+
+def test_closest_point_query_names_the_block():
+    hit = tfpv.closest(_two_far_cubes_multiblock(), [2.0, 0.0, 0.0])
+    assert hit.block_index == 1
+    assert hit.distance == 0.5
+    np.testing.assert_array_equal(hit.point, [2.5, 0.0, 0.0])
+
+
+def test_closest_mesh_query_gap():
+    probe = pv.Cube(center=(4.0, 0.0, 0.0), x_length=0.5, y_length=0.5,
+                    z_length=0.5).triangulate()
+    hit = tfpv.closest(_two_far_cubes_multiblock(), probe)
+    assert hit.block_index == 1
+    assert hit.distance == 0.25  # gap from x=3.5 to the probe at x=3.75
+    assert hit.point[0] == 3.5
+
+
+def test_closest_bare_points_query_names_the_block():
+    probe = pv.PolyData(np.array(
+        [[2.0, 0.0, 0.0], [10.0, 10.0, 10.0]], dtype=np.float32))
+    hit = tfpv.closest(_two_far_cubes_multiblock(), probe)
+    assert hit.block_index == 1
+    assert hit.distance == 0.5
+    np.testing.assert_array_equal(hit.point, [2.5, 0.0, 0.0])
+
+
+def test_closest_plain_polydata_target():
+    cube = _cube()
+    hit = tfpv.closest(cube, [1.0, 0.0, 0.0])
+    assert hit.block_index == 0
+    assert hit.block is cube
+    assert hit.distance == 0.5
+    np.testing.assert_array_equal(hit.point, [0.5, 0.0, 0.0])
+
+
+def test_closest_empty_multiblock():
+    assert tfpv.closest(pv.MultiBlock(), [0.0, 0.0, 0.0]) is None
+
+
 # -- registration ---------------------------------------------------------
 
 
