@@ -652,6 +652,40 @@ def test_chamfer_distance_exact_shift():
     assert tfpv.chamfer_distance(shifted, cube) == 0.25
 
 
+# -- tubes ----------------------------------------------------------------
+
+
+def _segment_soup_polydata(points, segments):
+    """Line-only PolyData of unordered 2-point segments."""
+    result = pv.PolyData()
+    result.SetPoints(pv.vtk_points(np.ascontiguousarray(points), deep=True))
+    cells = np.hstack([[2, *segment] for segment in segments])
+    result.lines = cells
+    return result
+
+
+def test_tube_from_unordered_segments():
+    points = np.array(
+        [[0, 0, 0], [1, 0, 0], [2, 0, 0], [3, 0, 0]], dtype=np.float32)
+    lines = _segment_soup_polydata(points, [[2, 3], [0, 1], [1, 2]])
+
+    result = tfpv.tube(lines, radius=0.25, n_segments=8)
+    assert result.n_points == 4 * 8  # one ring per path point
+    assert result.n_cells == 3 * 2 * 8  # two triangles per segment and ring
+
+    swept = np.asarray(result.points)
+    np.testing.assert_array_equal(np.hypot(swept[:, 1], swept[:, 2]), 0.25)
+    assert swept[:, 0].min() == 0.0
+    assert swept[:, 0].max() == 3.0
+
+
+def test_tube_refuses_non_line_input():
+    with pytest.raises(ValueError, match="lines only"):
+        tfpv.tube(_cube(), radius=0.1)
+    with pytest.raises(TypeError):
+        tfpv.tube(object(), radius=0.1)
+
+
 # -- packaging -----------------------------------------------------------
 
 

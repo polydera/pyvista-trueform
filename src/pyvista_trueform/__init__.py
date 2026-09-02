@@ -16,6 +16,7 @@ from ._conversion import (curves_to_pyvista, domains_to_pyvista,
 from ._factory import csg_graph, domains, mesh_arrangements
 from ._io import read, write
 from ._registration import align, chamfer_distance
+from ._tube import tube
 
 __all__ = [
     "TrueformAccessor",
@@ -29,5 +30,6 @@ __all__ = [
     "read",
     "to_pyvista",
     "to_trueform",
+    "tube",
     "write",
 ]
