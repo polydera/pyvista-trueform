@@ -53,7 +53,8 @@ def main():
 
     recut(7)
     plotter.add_slider_widget(recut, rng=[2, 15], value=7, title="bands",
-                              fmt="%.0f", color=_theme.LIGHT)
+                              fmt="%.0f", color=_theme.LIGHT,
+                              interaction_event="always")
     plotter.view_vector((0.5, -1.0, 0.55), viewup=(0.0, 0.0, 1.0))
     plotter.camera.zoom(1.25)
     plotter.show()
