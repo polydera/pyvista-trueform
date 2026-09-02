@@ -1,7 +1,7 @@
 # pyvista-trueform agent contract
 
 This package is a boundary and nothing more: PyVista datasets in, trueform
-results out, ~550 lines total. trueform owns every computation; PyVista owns
+results out, ~1000 lines total. trueform owns every computation; PyVista owns
 every dataset. Work here is judged by whether the boundary stays this thin.
 
 Developed jointly by Žiga Sajovic and Claude.

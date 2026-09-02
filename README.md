@@ -56,6 +56,55 @@ offset-block faces are exactly VTK 9's cell-array layout, and VTK retains
 the NumPy buffers. Everything trueform offers beyond the accessor's headline
 methods stays reachable by composition through these functions.
 
+### IO
+
+`tfpv.read(path)` and `tfpv.write(path, dataset)` move meshes through
+trueform's parallel STL and OBJ readers and writers, dispatched on the path
+suffix; reading converts zero-copy, STL welds duplicate vertices on the way
+in.
+
+### Domains and N-ary arrangements
+
+`tfpv.domains([a, b, c])` partitions space by every surface and returns each
+watertight volumetric domain as a block of a `pv.MultiBlock`, named by its
+domain id — pass a prebuilt `csg_graph(...)` and an expression to restrict
+it. `tfpv.mesh_arrangements([a, b, c])` returns the whole arrangement as one
+labeled PolyData instead.
+
+### Remesh
+
+`mesh.trueform.remeshed(target_length)`, `.decimated(proportion)`, and
+`.simplified()` surface trueform's parallel isotropic remesher and
+quadric-error tiers — boundary-, feature- and region-aware
+(`preserve_regions` labels ride back as cell data).
+
+### Queries
+
+`mesh.trueform.volume()`, `.area()`, `.ray_cast(origin, direction)`,
+`.distance(other)`, `.intersects(other)`, `.closest_point(point)`,
+`.principal_curvatures()`, `.shape_index()`, and `.boundary_curves()` answer
+against the cached mesh, so the spatial tree amortizes across calls.
+
+### Registration
+
+`tfpv.align(source, target, method=...)` fits a 4x4 world-to-world matrix
+(`"rigid"`, `"icp"`, `"obb"`, `"knn"`) over any point-bearing datasets or
+arrays, ready for `dataset.transform`; `tfpv.chamfer_distance(a, b)` is the
+one-way chamfer measure.
+
+### Tubes
+
+`tfpv.tube(lines, radius)` sweeps a triangle tube around line PolyData —
+unordered 2-point segments are connected into polylines first — or around
+the `(paths, points)` pair any trueform curve producer returns.
+
+### Coming with trueform 0.11
+
+`euler_characteristic`, `signed_distance`, orientation verdicts
+(`orient_faces_consistently`, `ensure_positive_orientation`), and
+`CsgGraph.outer_shell` — the graph-level shell read that spares the second
+arrangement build.
+
 ## License
 
 Noncommercial use under the PolyForm Noncommercial License 1.0.0 (see
