@@ -43,7 +43,7 @@ def _matched_clouds(source, target):
     return source, target
 
 
-def align(source, target, method="icp", **kwargs):
+def align(source, target, *, method="icp", **kwargs):
     """Fit the transformation carrying ``source`` onto ``target``.
 
     ``source`` and ``target`` are any PyVista datasets with ``.points``,

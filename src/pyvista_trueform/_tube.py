@@ -41,7 +41,7 @@ def _line_paths(dataset):
                                  np.ascontiguousarray(connectivity))
 
 
-def tube(lines, radius, n_segments=8):
+def tube(lines, radius, *, n_segments=8):
     """A triangle tube mesh around every polyline, as a fresh PolyData.
 
     ``lines`` is a line-only PolyData — polylines are swept as they are,
