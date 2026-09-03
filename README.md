@@ -1,5 +1,7 @@
 # pyvista-trueform
 
+![Six overlapping spheres split into their domains by one csg_graph arrangement](assets/hero_domains_multiblock.png)
+
 Exact mesh booleans, intersection curves, self-intersection repair,
 isocontours and isobands, and N-ary CSG on [PyVista](https://pyvista.org)
 meshes. PyVista in, PyVista out, through one `.trueform` accessor on
@@ -140,6 +142,8 @@ unordered 2-point segments are connected into polylines first — or around
 the `(paths, points)` pair any trueform curve producer returns.
 
 ### Examples
+
+![A sphere fractured by a grid of cutters in one csg_graph expression, read back as exploded domain chunks](assets/hero_csg_fracture.png)
 
 Seven standalone scripts in `examples/`, each with an importable
 `compute()` and a plotting `main()` (`python examples/<name>.py`); the
