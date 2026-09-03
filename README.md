@@ -162,7 +162,6 @@ gallery ships in the Polydera color scheme through the shared
 - `raycast_depth.py` — an orthographic depth image from one batched
   `tf.Ray` cast.
 
-
 ### Coming with trueform 0.11
 
 Orientation verdicts (`orient_faces_consistently`,

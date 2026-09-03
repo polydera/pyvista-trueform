@@ -748,6 +748,12 @@ def test_csg_graph_accepts_non_triangle_operands():
     assert mixed_union.trueform.is_closed()
 
 
+def test_csg_graph_accepts_a_single_dataset():
+    graph = tfpv.csg_graph([_two_cubes_concatenated()])
+    blocks = graph.domains()
+    assert blocks.n_blocks == 3
+
+
 def test_csg_graph_operands_reuse_accessor_cache():
     a = _cube()
     b = _cube(center=(0.5, 0.5, 0.5))

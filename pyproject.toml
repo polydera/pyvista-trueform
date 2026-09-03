@@ -7,7 +7,7 @@ name = "pyvista-trueform"
 version = "0.2.0"
 description = "PyVista accessor for trueform: exact mesh booleans, arrangements, intersection curves, and scalar-field cuts."
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.11"
 license = { file = "LICENSE.noncommercial" }
 authors = [
   { name = "Ziga Sajovic", email = "info@polydera.com" },
