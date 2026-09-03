@@ -12,6 +12,7 @@ import trueform as tf
 
 _METHODS = {
     "rigid": tf.fit_rigid_alignment,
+    "similarity": tf.fit_similarity_alignment,
     "icp": tf.fit_icp_alignment,
     "obb": tf.fit_obb_alignment,
     "knn": tf.fit_knn_alignment,
@@ -55,6 +56,9 @@ def align(source, target, method="icp", **kwargs):
 
     - ``"rigid"`` — :func:`trueform.fit_rigid_alignment`; requires the two
       point sets in one-to-one correspondence (Kabsch), no kwargs.
+    - ``"similarity"`` — :func:`trueform.fit_similarity_alignment`; rotation
+      + uniform scale + translation, same correspondence requirement as
+      ``"rigid"``, no kwargs.
     - ``"icp"`` — :func:`trueform.fit_icp_alignment`; iterative closest
       point with convergence detection (``max_iterations``, ``n_samples``,
       ``k``, ``sigma``, ``outlier_proportion``, ...).

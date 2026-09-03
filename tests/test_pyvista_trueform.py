@@ -871,6 +871,23 @@ def test_align_rigid_recovers_known_transform():
         np.asarray(sphere.points), atol=1e-4)
 
 
+def test_align_similarity_recovers_known_scale():
+    sphere = pv.Sphere()
+    truth = _rotation_translation(30.0, [0.3, -0.2, 0.5], np.float32)
+    scale = 1.7
+    truth[:3, :3] *= scale
+    moved = sphere.copy()
+    moved.points = _applied(truth, np.asarray(sphere.points))
+
+    recovered = tfpv.align(moved, sphere, method="similarity")
+    assert recovered.shape == (4, 4)
+    recovered_scale = np.linalg.det(recovered[:3, :3]) ** (1 / 3)
+    assert recovered_scale == pytest.approx(1.0 / scale, rel=1e-4)
+    np.testing.assert_allclose(
+        _applied(recovered, np.asarray(moved.points)),
+        np.asarray(sphere.points), atol=1e-4)
+
+
 @pytest.mark.parametrize("method,tolerance", [("icp", 0.01), ("obb", 1e-4),
                                               ("knn", 0.01)])
 def test_align_correspondence_free_methods(method, tolerance):
