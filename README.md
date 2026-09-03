@@ -47,9 +47,13 @@ graph = csg_graph([a, b, c])
 graph.mesh(tf.op(0) - (tf.op(1) | tf.op(2))).plot()
 ```
 
-`graph.mesh(...)`, `graph.domains()`, and `graph.intersection_curves()`
-answer directly in PyVista types; the rest of the graph's surface
-(`created_points`, `forms`, the construction state) lives on
+Operands need not be triangulated: an all-triangle set stays a triangle
+graph, anything else (quads, mixed) is re-expressed as dynamic faces first,
+losslessly. A single operand is legal too — its own self arrangement.
+
+`graph.mesh(...)`, `graph.domains()`, `graph.intersection_curves()`, and
+`graph.outer_shell()` answer directly in PyVista types; the rest of the
+graph's surface (`created_points`, `forms`, the construction state) lives on
 `graph.native`, the underlying `trueform.CsgGraph`.
 
 ### Conversions
@@ -74,7 +78,8 @@ in.
 watertight volumetric domain as a block of a `pv.MultiBlock`, named by its
 domain id — pass a prebuilt `csg_graph(...)` and an expression to restrict
 it. `tfpv.mesh_arrangements([a, b, c])` returns the whole arrangement as one
-labeled PolyData instead.
+labeled PolyData instead. `mesh.trueform.domains()` does the one-mesh case
+directly: a mesh's own overlap pockets, from its self arrangement.
 
 ### Picking
 
@@ -105,20 +110,22 @@ quadric-error tiers — boundary-, feature- and region-aware
 
 ### Queries
 
-`mesh.trueform.volume()`, `.area()`, `.ray_cast(ray, config=None)`,
-`.distance(other)`, `.intersects(other)`, `.closest_point(point)`,
+`mesh.trueform.volume()`, `.area()`, `.euler_characteristic()`,
+`.ray_cast(ray, config=None)`, `.distance(other)`,
+`.signed_distance(other)`, `.intersects(other)`, `.closest_point(point)`,
 `.closest_point_pair(other)`, `.principal_curvatures()`, `.shape_index()`,
 and `.boundary_curves()` answer against the cached mesh, so the spatial
 tree amortizes across calls. Queries speak trueform primitives —
-`ray_cast` takes a `tf.Ray(origin=..., direction=...)`, single or a whole
-batch — and every value this package names "distance" is euclidean.
+`ray_cast` takes a `tf.Ray(origin=..., direction=...)`, `signed_distance`
+takes this dataset's own points as one batched query — and every value
+this package names "distance" is euclidean.
 
 ### Registration
 
 `tfpv.align(source, target, method=...)` fits a 4x4 world-to-world matrix
-(`"rigid"`, `"icp"`, `"obb"`, `"knn"`) over any point-bearing datasets or
-arrays, ready for `dataset.transform`; `tfpv.chamfer_distance(a, b)` is the
-one-way chamfer measure.
+(`"rigid"`, `"similarity"`, `"icp"`, `"obb"`, `"knn"`) over any
+point-bearing datasets or arrays, ready for `dataset.transform`;
+`tfpv.chamfer_distance(a, b)` is the one-way chamfer measure.
 
 ### Tubes
 
@@ -151,10 +158,9 @@ gallery ships in the Polydera color scheme through the shared
 
 ### Coming with trueform 0.11
 
-`euler_characteristic`, `signed_distance`, orientation verdicts
-(`orient_faces_consistently`, `ensure_positive_orientation`), and
-`CsgGraph.outer_shell` — the graph-level shell read that spares the second
-arrangement build.
+Orientation verdicts (`orient_faces_consistently`,
+`ensure_positive_orientation`) — the Python binding still returns only the
+repaired faces array, no verdict yet.
 
 ## License
 
