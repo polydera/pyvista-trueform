@@ -10,6 +10,8 @@ https://github.com/polydera/pyvista-trueform
 import numpy as np
 import trueform as tf
 
+from ._forward import _forwarded
+
 _METHODS = {
     "rigid": tf.fit_rigid_alignment,
     "similarity": tf.fit_similarity_alignment,
@@ -43,7 +45,9 @@ def _matched_clouds(source, target):
     return source, target
 
 
-def align(source, target, *, method="icp", **kwargs):
+def align(source, target, *, method="icp", max_iterations=None,
+         n_samples=None, k=None, sigma=None, outlier_proportion=None,
+         min_relative_improvement=None, ema_alpha=None, sample_size=None):
     """Fit the transformation carrying ``source`` onto ``target``.
 
     ``source`` and ``target`` are any PyVista datasets with ``.points``,
@@ -52,16 +56,19 @@ def align(source, target, *, method="icp", **kwargs):
     coordinates to target world coordinates — ready for
     ``dataset.transform(matrix)``.
 
-    Methods (each forwards its keyword arguments to the trueform entry):
+    Methods (each reads only the options its own trueform entry takes;
+    trueform's defaults apply when an option is omitted, and passing an
+    option a method does not take raises there, by name):
 
     - ``"rigid"`` — :func:`trueform.fit_rigid_alignment`; requires the two
-      point sets in one-to-one correspondence (Kabsch), no kwargs.
+      point sets in one-to-one correspondence (Kabsch), no options.
     - ``"similarity"`` — :func:`trueform.fit_similarity_alignment`; rotation
       + uniform scale + translation, same correspondence requirement as
-      ``"rigid"``, no kwargs.
+      ``"rigid"``, no options.
     - ``"icp"`` — :func:`trueform.fit_icp_alignment`; iterative closest
       point with convergence detection (``max_iterations``, ``n_samples``,
-      ``k``, ``sigma``, ``outlier_proportion``, ...).
+      ``k``, ``sigma``, ``outlier_proportion``,
+      ``min_relative_improvement``, ``ema_alpha``).
     - ``"obb"`` — :func:`trueform.fit_obb_alignment`; oriented-bounding-box
       axes, no correspondences (``sample_size``).
     - ``"knn"`` — :func:`trueform.fit_knn_alignment`; one soft-correspondence
@@ -80,7 +87,11 @@ def align(source, target, *, method="icp", **kwargs):
         raise ValueError(
             f"unknown alignment method {method!r}; supported: {supported}")
     source, target = _matched_clouds(source, target)
-    return _METHODS[method](source, target, **kwargs)
+    return _METHODS[method](source, target, **_forwarded(
+        max_iterations=max_iterations, n_samples=n_samples, k=k,
+        sigma=sigma, outlier_proportion=outlier_proportion,
+        min_relative_improvement=min_relative_improvement,
+        ema_alpha=ema_alpha, sample_size=sample_size))
 
 
 def chamfer_distance(source, target):

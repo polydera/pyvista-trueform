@@ -13,6 +13,7 @@ import trueform as tf
 from vtkmodules.util.numpy_support import vtk_to_numpy
 
 from ._conversion import _validated_points, to_pyvista
+from ._forward import _forwarded
 
 
 def _line_paths(dataset):
@@ -41,7 +42,7 @@ def _line_paths(dataset):
                                  np.ascontiguousarray(connectivity))
 
 
-def tube(lines, radius, *, n_segments=8):
+def tube(lines, radius, *, n_segments=None):
     """A triangle tube mesh around every polyline, as a fresh PolyData.
 
     ``lines`` is a line-only PolyData — polylines are swept as they are,
@@ -56,8 +57,10 @@ def tube(lines, radius, *, n_segments=8):
         The polylines to sweep.
     radius : float
         Tube radius.
-    n_segments : int, default 8
-        Vertices per cross-section ring.
+    n_segments : int, optional
+        Vertices per cross-section ring (``radial_segments`` in
+        :func:`trueform.make_tube_mesh`). Trueform's default applies when
+        omitted.
 
     Returns
     -------
@@ -75,7 +78,7 @@ def tube(lines, radius, *, n_segments=8):
     points = np.ascontiguousarray(_validated_points(points))
     return to_pyvista(
         tf.make_tube_mesh((paths, points), radius,
-                          radial_segments=n_segments))
+                          **_forwarded(radial_segments=n_segments)))
 
 
 __all__ = ["tube"]

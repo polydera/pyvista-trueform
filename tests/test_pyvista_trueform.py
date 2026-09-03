@@ -296,6 +296,25 @@ def test_accessor_boolean_forwards_sheets():
     assert result.trueform.is_closed()
 
 
+@pytest.mark.parametrize("call,typo", [
+    (lambda cube, sheet: cube.trueform.difference(sheet, sheeets=[1]),
+     "sheeets"),
+    (lambda cube, sheet: cube.trueform.cleaned(
+        remove_duplicate_primitivess=False), "remove_duplicate_primitivess"),
+    (lambda cube, sheet: tfpv.csg_graph([cube, sheet], triangulatio="cdt"),
+     "triangulatio"),
+], ids=["accessor_boolean", "accessor_cleaned", "module_csg_graph"])
+def test_typo_option_raises_typeerror_at_our_signature(call, typo):
+    """Every option is a named parameter, so a typo is a TypeError at OUR
+    signature naming the unexpected argument — never silently swallowed
+    by a bare **kwargs."""
+    cube = pv.Cube().triangulate()
+    sheet = pv.Plane(i_size=2, j_size=2,
+                     i_resolution=1, j_resolution=1).triangulate()
+    with pytest.raises(TypeError, match=typo):
+        call(cube, sheet)
+
+
 def test_accessor_boolean_curves():
     a = _cube()
     b = _cube(center=(0.5, 0.5, 0.5))

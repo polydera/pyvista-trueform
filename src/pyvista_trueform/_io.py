@@ -12,6 +12,7 @@ from pathlib import Path
 import trueform as tf
 
 from ._conversion import to_pyvista, to_trueform
+from ._forward import _forwarded
 
 _READERS = {".stl": tf.read_stl, ".obj": tf.read_obj}
 _WRITERS = {".stl": tf.write_stl, ".obj": tf.write_obj}
@@ -27,7 +28,7 @@ def _dispatched(path, table):
     return table[suffix]
 
 
-def read(path, **kwargs):
+def read(path, *, index_dtype=None, ngon=None, dtype=None):
     """Read a mesh file into a fresh PyVista PolyData through trueform.
 
     Dispatches on the path suffix: ``.stl`` through
@@ -40,19 +41,24 @@ def read(path, **kwargs):
     ----------
     path : str or os.PathLike
         Mesh file to read.
-    **kwargs
-        Forwarded to the trueform reader (``index_dtype``; for OBJ also
-        ``ngon`` and ``dtype``).
+    index_dtype : dtype, optional
+        Forwarded to the trueform reader (both formats). Trueform's
+        default applies when omitted.
+    ngon, dtype : optional
+        Forwarded to :func:`trueform.read_obj` only — ``.stl`` has no such
+        options, so passing either for an ``.stl`` path raises there.
+        Trueform's defaults apply when omitted.
 
     Returns
     -------
     pyvista.PolyData
     """
     reader = _dispatched(path, _READERS)
-    return to_pyvista(reader(str(path), **kwargs))
+    return to_pyvista(reader(str(path), **_forwarded(
+        index_dtype=index_dtype, ngon=ngon, dtype=dtype)))
 
 
-def write(path, dataset, **kwargs):
+def write(path, dataset, *, transformation=None):
     """Write a polygonal PyVista dataset to a mesh file through trueform.
 
     Dispatches on the path suffix: ``.stl`` through
@@ -66,11 +72,14 @@ def write(path, dataset, **kwargs):
         Output file path.
     dataset : pyvista.PolyData
         Polygon-only dataset (no vertices, lines, or strips).
-    **kwargs
-        Forwarded to the trueform writer (``transformation``).
+    transformation : ndarray, optional
+        Forwarded to the trueform writer (both formats); overrides any
+        transformation set on a :class:`trueform.Mesh` operand. Trueform's
+        default applies when omitted.
     """
     writer = _dispatched(path, _WRITERS)
-    if not writer(to_trueform(dataset), str(path), **kwargs):
+    if not writer(to_trueform(dataset), str(path),
+                  **_forwarded(transformation=transformation)):
         raise OSError(f"trueform failed to write {path!r}")
 
 

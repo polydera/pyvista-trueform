@@ -14,6 +14,7 @@ import pyvista as pv
 import trueform as tf
 
 from .._conversion import curves_to_pyvista
+from .._forward import _forwarded
 from . import _operand_mesh
 
 
@@ -159,20 +160,22 @@ class _QueriesMixin:
         pair, (metric, point, other_point) = result
         return (pair, (math.sqrt(metric), point, other_point))
 
-    def principal_curvatures(self, **kwargs):
+    def principal_curvatures(self, *, k=None, directions=None):
         """Per-vertex principal curvatures ``(k0, k1)``; with
-        ``directions=True`` also ``(d0, d1)``. ``k`` (default 2) sets the
-        k-ring neighborhood size for the curvature estimate. See
-        :func:`trueform.principal_curvatures` for details.
+        ``directions=True`` also ``(d0, d1)``. ``k`` sets the k-ring
+        neighborhood size for the curvature estimate. When omitted,
+        trueform's defaults apply — see :func:`trueform.principal_curvatures`.
         """
-        return tf.principal_curvatures(self.to_mesh(), **kwargs)
+        return tf.principal_curvatures(
+            self.to_mesh(), **_forwarded(k=k, directions=directions))
 
-    def shape_index(self, **kwargs):
-        """Per-vertex shape index in ``[-1, 1]`` (cup to cap). ``k``
-        (default 2) sets the k-ring neighborhood size for the underlying
-        curvature estimate. See :func:`trueform.shape_index` for details.
+    def shape_index(self, *, k=None):
+        """Per-vertex shape index in ``[-1, 1]`` (cup to cap). ``k`` sets
+        the k-ring neighborhood size for the underlying curvature estimate.
+        When omitted, trueform's default applies — see
+        :func:`trueform.shape_index`.
         """
-        return tf.shape_index(self.to_mesh(), **kwargs)
+        return tf.shape_index(self.to_mesh(), **_forwarded(k=k))
 
     def boundary_curves(self):
         """The mesh's boundary loops as a line-only PolyData.

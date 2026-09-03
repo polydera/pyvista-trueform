@@ -12,6 +12,7 @@ import trueform as tf
 
 from ._accessor import _operand_mesh
 from ._conversion import curves_to_pyvista, domains_to_pyvista, to_pyvista
+from ._forward import _forwarded
 
 
 def _labeled(mesh, labels=None, face_labels=None):
@@ -87,53 +88,64 @@ class CsgGraph:
         """
         return self._graph
 
-    def mesh(self, expr=None, **kwargs):
+    def mesh(self, expr=None, *, selection=None, inside=None,
+             return_source_ids=None, return_index_map=None):
         """The boolean result of ``expr`` as a PyVista PolyData.
 
         With no expression, the full arrangement mesh (every input face,
-        cut at intersections). See :meth:`trueform.CsgGraph.mesh` for
-        keyword arguments (``selection``, ``inside``,
-        ``return_source_ids``, ``return_index_map``). With
-        ``return_source_ids=True`` the provenance labels ride as cell data
-        (``trueform_labels``, ``trueform_face_labels``); with
-        ``return_index_map=True`` returns ``(polydata, index_map)``, the
-        :class:`trueform.MeshIndexMap` passed through untouched.
+        cut at intersections). See :meth:`trueform.CsgGraph.mesh` for what
+        each option controls (``selection``, ``inside``,
+        ``return_source_ids``, ``return_index_map``); trueform's defaults
+        apply when omitted. With ``return_source_ids=True`` the provenance
+        labels ride as cell data (``trueform_labels``,
+        ``trueform_face_labels``); with ``return_index_map=True`` returns
+        ``(polydata, index_map)``, the :class:`trueform.MeshIndexMap`
+        passed through untouched.
 
         Returns
         -------
         pyvista.PolyData
         """
-        result = self._graph.mesh(expr, **kwargs)
-        if kwargs.get("return_index_map"):
+        result = self._graph.mesh(expr, **_forwarded(
+            selection=selection, inside=inside,
+            return_source_ids=return_source_ids,
+            return_index_map=return_index_map))
+        if return_index_map:
             mesh, index_map = result
             return to_pyvista(mesh), index_map
-        if kwargs.get("return_source_ids"):
+        if return_source_ids:
             mesh, labels, face_labels = result
             return _labeled(mesh, labels, face_labels)
         return to_pyvista(result)
 
-    def domains(self, expr=None, **kwargs):
+    def domains(self, expr=None, *, selection=None, exclude_outer_shell=None,
+               ignore_open_fragments=None, return_source_ids=None,
+               return_index_map=None):
         """Every kept volumetric domain as a block of a PyVista MultiBlock.
 
         Block ``k`` is domain ``ids[k]``, named ``str(ids[k])``. See
-        :meth:`trueform.CsgGraph.domains` for keyword arguments
+        :meth:`trueform.CsgGraph.domains` for what each option controls
         (``selection``, ``exclude_outer_shell``, ``ignore_open_fragments``,
-        ``return_source_ids``, ``return_index_map``). With
-        ``return_source_ids=True`` also returns per-cell face provenance as
-        two :class:`trueform.OffsetBlockedArray`, parallel to the block
-        list, passed through untouched; with ``return_index_map=True``
-        returns ``(multiblock, index_map)``, the
+        ``return_source_ids``, ``return_index_map``); trueform's defaults
+        apply when omitted. With ``return_source_ids=True`` also returns
+        per-cell face provenance as two :class:`trueform.OffsetBlockedArray`,
+        parallel to the block list, passed through untouched; with
+        ``return_index_map=True`` returns ``(multiblock, index_map)``, the
         :class:`trueform.DomainsIndexMap` passed through untouched.
 
         Returns
         -------
         pyvista.MultiBlock
         """
-        result = self._graph.domains(expr, **kwargs)
-        if kwargs.get("return_index_map"):
+        result = self._graph.domains(expr, **_forwarded(
+            selection=selection, exclude_outer_shell=exclude_outer_shell,
+            ignore_open_fragments=ignore_open_fragments,
+            return_source_ids=return_source_ids,
+            return_index_map=return_index_map))
+        if return_index_map:
             cells, ids, index_map = result
             return domains_to_pyvista(cells, ids), index_map
-        if kwargs.get("return_source_ids"):
+        if return_source_ids:
             cells, ids, tag_blocks, face_blocks = result
             return domains_to_pyvista(cells, ids), tag_blocks, face_blocks
         cells, ids = result
@@ -166,7 +178,8 @@ class CsgGraph:
         return to_pyvista(self._graph.outer_shell())
 
 
-def csg_graph(datasets, **kwargs):
+def csg_graph(datasets, *, sheets=None, mode=None, tolerance=None,
+             resolve_crossings=None, within=None, triangulation=None):
     """Build a :class:`CsgGraph` over PyVista datasets.
 
     One arrangement of N operands, arbitrarily many boolean expressions
@@ -183,10 +196,9 @@ def csg_graph(datasets, **kwargs):
     ----------
     datasets : sequence of pyvista.PolyData or trueform.Mesh
         The operands.
-    **kwargs
-        Forwarded to :class:`trueform.CsgGraph` (``sheets``, ``mode``,
-        ``tolerance``, ``resolve_crossings``, ``within``,
-        ``triangulation``).
+    sheets, mode, tolerance, resolve_crossings, within, triangulation
+        Forwarded to :class:`trueform.CsgGraph`; trueform's defaults apply
+        when omitted. See :class:`trueform.CsgGraph` for what each controls.
 
     Returns
     -------
@@ -194,10 +206,16 @@ def csg_graph(datasets, **kwargs):
     """
     meshes = _normalized_operands([_operand_mesh(dataset)
                                    for dataset in datasets])
-    return CsgGraph(tf.CsgGraph(meshes, **kwargs))
+    return CsgGraph(tf.CsgGraph(meshes, **_forwarded(
+        sheets=sheets, mode=mode, tolerance=tolerance,
+        resolve_crossings=resolve_crossings, within=within,
+        triangulation=triangulation)))
 
 
-def mesh_arrangements(datasets, **kwargs):
+def mesh_arrangements(datasets, *, return_curves=False, mode=None,
+                      tolerance=None, resolve_crossings=None,
+                      resolve_self_crossings=None, within=None,
+                      triangulation=None):
     """The arrangement of N PyVista datasets as one labeled PolyData.
 
     Every face is split along every intersection curve; the source mesh of
@@ -211,11 +229,11 @@ def mesh_arrangements(datasets, **kwargs):
     ----------
     datasets : sequence of pyvista.PolyData or trueform.Mesh
         The operands, two or more.
-    **kwargs
-        Forwarded to :func:`trueform.mesh_arrangements` (``mode``,
-        ``tolerance``, ``resolve_crossings``, ``resolve_self_crossings``,
-        ``within``, ``triangulation``, in addition to ``return_curves``
-        above).
+    return_curves, mode, tolerance, resolve_crossings, resolve_self_crossings, within, triangulation
+        Forwarded to :func:`trueform.mesh_arrangements`; trueform's
+        defaults apply when omitted (except ``return_curves``, whose
+        default lives here since this wrapper reads it to shape its own
+        return value).
 
     Returns
     -------
@@ -223,8 +241,14 @@ def mesh_arrangements(datasets, **kwargs):
     """
     meshes = _normalized_operands([_operand_mesh(dataset)
                                    for dataset in datasets])
-    result = tf.mesh_arrangements(meshes, **kwargs)
-    if kwargs.get("return_curves"):
+    result = tf.mesh_arrangements(meshes, return_curves=return_curves,
+                                  **_forwarded(
+                                      mode=mode, tolerance=tolerance,
+                                      resolve_crossings=resolve_crossings,
+                                      resolve_self_crossings=resolve_self_crossings,
+                                      within=within,
+                                      triangulation=triangulation))
+    if return_curves:
         mesh, tag_labels, face_labels, curves = result
         return (_labeled(mesh, tag_labels, face_labels),
                 curves_to_pyvista(curves))
@@ -232,7 +256,9 @@ def mesh_arrangements(datasets, **kwargs):
     return _labeled(mesh, tag_labels, face_labels)
 
 
-def domains(datasets_or_graph, expr=None, **kwargs):
+def domains(datasets_or_graph, expr=None, *, selection=None,
+           exclude_outer_shell=None, ignore_open_fragments=None,
+           return_source_ids=None, return_index_map=None):
     """Every kept volumetric domain as a block of a PyVista MultiBlock.
 
     The arrangement of the operands partitions space into watertight
@@ -248,10 +274,9 @@ def domains(datasets_or_graph, expr=None, **kwargs):
         The operands, or the built graph.
     expr : trueform.Expr or int, optional
         Restrict to domains inside the expression's selection.
-    **kwargs
-        Forwarded to :meth:`CsgGraph.domains`
-        (``selection``, ``exclude_outer_shell``, ``ignore_open_fragments``,
-        ``return_source_ids``, ``return_index_map``).
+    selection, exclude_outer_shell, ignore_open_fragments, return_source_ids, return_index_map
+        Forwarded to :meth:`CsgGraph.domains`; trueform's defaults apply
+        when omitted.
 
     Returns
     -------
@@ -262,7 +287,11 @@ def domains(datasets_or_graph, expr=None, **kwargs):
         graph = CsgGraph(graph)
     elif not isinstance(graph, CsgGraph):
         graph = csg_graph(datasets_or_graph)
-    return graph.domains(expr, **kwargs)
+    return graph.domains(expr, selection=selection,
+                         exclude_outer_shell=exclude_outer_shell,
+                         ignore_open_fragments=ignore_open_fragments,
+                         return_source_ids=return_source_ids,
+                         return_index_map=return_index_map)
 
 
 __all__ = ["CsgGraph", "csg_graph", "domains", "mesh_arrangements"]
