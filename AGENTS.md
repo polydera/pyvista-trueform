@@ -60,6 +60,22 @@ Developed jointly by Žiga Sajovic and Claude.
   entry point — both, so `import pyvista_trueform` and a bare
   `import pyvista` reach the same accessor.
 
+## Working here
+
+- The package is installed editable, so edits are live; the gate is
+  `python -m pytest tests` (~1 s) after every change, plus
+  `PYVISTA_OFF_SCREEN=true python examples/<name>.py` for any example
+  touched — every `main()` must exit clean headless.
+- Verify every trueform signature against the installed wheel or
+  /Users/ziga/trueform/python/src/trueform/ BEFORE calling it; never
+  guess a kwarg or a return shape. Run the call live before writing its
+  test.
+- Commits: house conventional style (`feat(scope): lowercase declarative`),
+  one concern per commit, tests land with the feature they fixture, NO
+  trailers of any kind.
+- The Polydera colormaps in `examples/_theme.py` are a copy of
+  /Users/ziga/polydera/lunar/src/viewport/colorMaps.ts — that file is the
+  definition's home; never let the two drift silently.
 ## Validation
 
 ```bash
