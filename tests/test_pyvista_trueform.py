@@ -553,6 +553,17 @@ def test_accessor_closest_point_on_corner():
             == cube.find_closest_point([0.5, 0.5, 0.5])).any()
 
 
+def test_accessor_closest_point_radius():
+    cube = _cube()
+    # euclidean to the (0.5, 0.5, 0.5) corner: sqrt(3 * 1.5**2) ~= 2.598
+    assert cube.trueform.closest_point(
+        [2.0, 2.0, 2.0], radius=1.0) is None
+    face_id, distance, point = cube.trueform.closest_point(
+        [2.0, 2.0, 2.0], radius=10.0)
+    assert distance == math.sqrt(6.75)
+    np.testing.assert_array_equal(point, [0.5, 0.5, 0.5])
+
+
 def test_accessor_closest_point_pair_between_meshes():
     a = _cube()
     far = _cube(center=(3.0, 0.0, 0.0))  # gap from x=0.5 to x=2.5
@@ -587,6 +598,24 @@ def test_accessor_closest_point_pair_with_bare_points():
     np.testing.assert_array_equal(
         np.asarray(cube.points)[cube.regular_faces[face], 0],
         [0.5, 0.5, 0.5])
+
+
+def test_accessor_closest_point_pair_radius():
+    cube = _cube()
+    far = _cube(center=(3.0, 0.0, 0.0))  # gap from x=0.5 to x=2.5
+    assert cube.trueform.closest_point_pair(far, radius=0.5) is None
+    pair, (distance, point_a, point_far) = \
+        cube.trueform.closest_point_pair(far, radius=5.0)
+    assert distance == 2.0
+
+    operand = pv.PolyData(np.array(
+        [[2.5, 0.0, 0.0], [5.0, 5.0, 5.0], [-3.0, 0.0, 0.0]],
+        dtype=np.float32))
+    assert cube.trueform.closest_point_pair(operand, radius=0.5) is None
+    (face, point_id), (distance2, point, other_point) = \
+        cube.trueform.closest_point_pair(operand, radius=5.0)
+    assert point_id == 0
+    assert distance2 == 2.0
 
 
 def test_accessor_closest_point_pair_refuses_pointless_operand():
@@ -872,6 +901,21 @@ def test_pick_skips_none_blocks_and_keeps_their_numbers():
     assert hit.t == 2.5
 
 
+def test_pick_forwards_config():
+    blocks = pv.MultiBlock([_cube(), _cube(center=(3.0, 0.0, 0.0))])
+    ray = _ray([0.0, 0.0, 0.0], [1.0, 0.0, 0.0])
+    unbounded = tfpv.pick(blocks, ray)
+    assert unbounded.block_index == 0
+    assert unbounded.t == 0.5
+
+    # min_t excludes block 0's hit, so block 1's farther one wins instead.
+    past_block_0 = tfpv.pick(blocks, ray, config=(1.0, 10.0))
+    assert past_block_0.block_index == 1
+    assert past_block_0.t == 2.5
+
+    assert tfpv.pick(blocks, ray, config=(0.0, 0.4)) is None
+
+
 def test_pick_refuses_non_polydata_block():
     blocks = pv.MultiBlock([_cube(), pv.ImageData()])
     with pytest.raises(TypeError, match="block 1 must be"):
@@ -912,6 +956,20 @@ def test_closest_bare_points_query_names_the_block():
     assert hit.block_index == 1
     assert hit.distance == 0.5
     np.testing.assert_array_equal(hit.point, [2.5, 0.0, 0.0])
+
+
+def test_closest_forwards_radius():
+    target = _two_far_cubes_multiblock()
+    query = [2.0, 0.0, 0.0]  # block 0 at distance 1.5, block 1 at 0.5
+    unbounded = tfpv.closest(target, query)
+    assert unbounded.block_index == 1
+    assert unbounded.distance == 0.5
+
+    within = tfpv.closest(target, query, radius=1.0)
+    assert within.block_index == 1
+    assert within.distance == 0.5
+
+    assert tfpv.closest(target, query, radius=0.3) is None
 
 
 def test_closest_plain_polydata_target():

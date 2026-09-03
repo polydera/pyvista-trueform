@@ -77,7 +77,7 @@ def _flat_blocks(target):
         yield index, block
 
 
-def pick(target, ray):
+def pick(target, ray, *, config=None):
     """The first face of ``target`` in the ray's way, naming its block.
 
     Every block answers through its own accessor cache
@@ -92,6 +92,9 @@ def pick(target, ray):
         MultiBlocks flatten; ``None`` blocks are skipped.
     ray : trueform.Ray
         A single ray; picking a batch of rays is future work.
+    config : tuple[float, float], optional
+        The ``(min_t, max_t)`` parametric range, forwarded verbatim to
+        every block's :meth:`~pyvista_trueform.TrueformAccessor.ray_cast`.
 
     Returns
     -------
@@ -107,7 +110,7 @@ def pick(target, ray):
             "batch picking is future work")
     best = None
     for index, block in _flat_blocks(target):
-        hit = block.trueform.ray_cast(ray)
+        hit = block.trueform.ray_cast(ray, config=config)
         if hit is None:
             continue
         face, t = hit
@@ -121,7 +124,7 @@ def pick(target, ray):
     return RayHit(index, block, face, point, t)
 
 
-def closest(target, query):
+def closest(target, query, *, radius=None):
     """The block of ``target`` nearest to ``query``, with its witness.
 
     A length-3 ``query`` asks each block through its accessor's
@@ -140,21 +143,31 @@ def closest(target, query):
         A point, or any operand
         :meth:`~pyvista_trueform.TrueformAccessor.closest_point_pair`
         takes.
+    radius : float, optional
+        Forwarded to every block's query; a block with nothing within
+        ``radius`` is skipped rather than winning with an unbounded
+        witness.
 
     Returns
     -------
     ClosestHit or None
-        ``None`` when the target has no blocks.
+        ``None`` when the target has no blocks, or none has a witness
+        within ``radius``.
     """
     query_is_dataset = isinstance(
         query, (tf.Mesh, pv.PolyData, pv.PointSet))
     best = None
     for index, block in _flat_blocks(target):
         if query_is_dataset:
-            (face, _), (distance, point, _) = \
-                block.trueform.closest_point_pair(query)
+            hit = block.trueform.closest_point_pair(query, radius=radius)
+            if hit is None:
+                continue
+            (face, _), (distance, point, _) = hit
         else:
-            face, distance, point = block.trueform.closest_point(query)
+            hit = block.trueform.closest_point(query, radius=radius)
+            if hit is None:
+                continue
+            face, distance, point = hit
         if best is None or distance < best.distance:
             best = ClosestHit(index, block, face, point, distance)
     return best

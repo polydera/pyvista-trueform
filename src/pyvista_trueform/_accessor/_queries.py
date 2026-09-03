@@ -101,30 +101,39 @@ class _QueriesMixin:
         """
         return tf.intersects(self.to_mesh(), _operand_mesh(other))
 
-    def closest_point(self, query_point):
+    def closest_point(self, query_point, *, radius=None):
         """The mesh point closest to ``query_point``.
 
         Returns ``(face_id, distance, point)`` — the nearest face, the
-        euclidean distance, and the closest point on the mesh. The
-        underlying :func:`trueform.neighbor_search` reports the squared
-        metric; this package says "distance" only for euclidean.
+        euclidean distance, and the closest point on the mesh — or
+        ``None`` when ``radius`` bounds the search and nothing lies
+        within it. The underlying :func:`trueform.neighbor_search` reports
+        the squared metric; this package says "distance" only for
+        euclidean. Its ``k`` is not reachable here: a batch of neighbors
+        does not fit this method's single-result return shape.
         """
-        face_id, distance2, point = tf.neighbor_search(
-            self.to_mesh(), self._query_point(query_point, "query_point"))
+        result = tf.neighbor_search(
+            self.to_mesh(), self._query_point(query_point, "query_point"),
+            radius=radius)
+        if result is None:
+            return None
+        face_id, distance2, point = result
         return face_id, math.sqrt(float(distance2)), point
 
-    def closest_point_pair(self, other):
+    def closest_point_pair(self, other, *, radius=None):
         """The closest witness pair between this mesh and ``other``.
 
         Returns ``((face_id, other_id), (distance, point, other_point))``
         — the nearest face of this mesh, the witness point on it, the
         witness point on ``other``, and the euclidean distance between
-        them (consistent with :meth:`distance`). A faced operand
-        (polygonal PolyData or trueform Mesh) answers mesh-to-mesh
+        them (consistent with :meth:`distance`) — or ``None`` when
+        ``radius`` bounds the search and nothing lies within it. A faced
+        operand (polygonal PolyData or trueform Mesh) answers mesh-to-mesh
         through :func:`trueform.neighbor_search`, and ``other_id`` names
         its nearest face; a faceless one (bare-points PolyData, PointSet)
         queries its points as one batched :class:`trueform.Point`, and
-        ``other_id`` names its nearest point.
+        ``other_id`` names its nearest point. ``k`` is excluded, for the
+        same reason as :meth:`closest_point`.
         """
         mesh = self.to_mesh()
         if isinstance(other, pv.PointSet) or (
@@ -136,13 +145,18 @@ class _QueriesMixin:
             batch = np.ascontiguousarray(
                 points.astype(mesh.dtype, copy=False))
             ids, distances2, witnesses = tf.neighbor_search(
-                mesh, tf.Point(batch))
+                mesh, tf.Point(batch), radius=radius)
             nearest = int(np.argmin(distances2))
+            if ids[nearest] < 0:
+                return None
             return ((int(ids[nearest]), nearest),
                     (math.sqrt(float(distances2[nearest])),
                      witnesses[nearest], batch[nearest]))
-        pair, (metric, point, other_point) = tf.neighbor_search(
-            mesh, _operand_mesh(other))
+        result = tf.neighbor_search(mesh, _operand_mesh(other),
+                                    radius=radius)
+        if result is None:
+            return None
+        pair, (metric, point, other_point) = result
         return (pair, (math.sqrt(metric), point, other_point))
 
     def principal_curvatures(self, **kwargs):
