@@ -41,6 +41,13 @@ class _QueriesMixin:
         """Enclosed volume of a closed mesh. See :func:`trueform.volume`."""
         return tf.volume(self.to_mesh())
 
+    def euler_characteristic(self):
+        """Euler characteristic ``V - E + F``, each undirected edge counted
+        once (boundary and non-manifold edges count like interior ones).
+        See :func:`trueform.euler_characteristic`.
+        """
+        return tf.euler_characteristic(self.to_mesh())
+
     def ray_cast(self, ray, config=None):
         """First mesh face hit by the ray, through the cached spatial tree.
 

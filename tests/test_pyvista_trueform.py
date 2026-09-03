@@ -416,6 +416,17 @@ def test_accessor_measurements_exact():
     assert cube.trueform.area() == 6.0
 
 
+def test_accessor_euler_characteristic():
+    sphere = pv.Sphere().triangulate()
+    assert sphere.trueform.euler_characteristic() == 2
+
+    plane = pv.Plane(i_resolution=3, j_resolution=3).triangulate()
+    assert plane.trueform.euler_characteristic() == 1
+
+    torus = pv.ParametricTorus(u_res=10, v_res=10).triangulate()
+    assert torus.trueform.euler_characteristic() == 0
+
+
 def test_accessor_signed_distance_known_values():
     cube = _cube()  # extent [-0.5, 0.5], float32
     queries = pv.PolyData(
