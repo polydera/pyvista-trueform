@@ -318,6 +318,17 @@ def test_accessor_self_intersection_family():
     assert shell.volume == pytest.approx(1.875, rel=1e-4)
 
 
+def test_accessor_domains_self_decomposition():
+    soup = _two_cubes_concatenated()
+    blocks = soup.trueform.domains()
+    assert isinstance(blocks, pv.MultiBlock)
+    assert blocks.n_blocks == 3
+    volumes = sorted(block.volume for block in blocks)
+    np.testing.assert_allclose(volumes, [0.125, 0.875, 0.875], rtol=1e-4)
+    for block in blocks:
+        assert block.trueform.is_closed()
+
+
 def test_accessor_isocontours_and_isobands():
     sphere = pv.Sphere()
     sphere.point_data["height"] = np.asarray(sphere.points)[:, 2].copy()

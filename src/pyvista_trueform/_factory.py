@@ -112,7 +112,7 @@ def csg_graph(datasets, **kwargs):
     Parameters
     ----------
     datasets : sequence of pyvista.PolyData or trueform.Mesh
-        The operands, at least two.
+        The operands. A single operand is legal: its own self arrangement.
     **kwargs
         Forwarded to :class:`trueform.CsgGraph` (``sheets``, ``mode``,
         ``tolerance``, ``resolve_crossings``, ``within``,
@@ -172,7 +172,7 @@ def domains(datasets_or_graph, expr=None, **kwargs):
     Parameters
     ----------
     datasets_or_graph : sequence of pyvista.PolyData/trueform.Mesh, or CsgGraph, or trueform.CsgGraph
-        The operands, at least two triangle meshes; or the built graph.
+        The operands, or the built graph.
     expr : trueform.Expr or int, optional
         Restrict to domains inside the expression's selection.
     **kwargs

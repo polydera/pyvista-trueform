@@ -9,10 +9,27 @@ https://github.com/polydera/pyvista-trueform
 
 import trueform as tf
 
-from .._conversion import curves_to_pyvista, to_pyvista
+from .._conversion import curves_to_pyvista, domains_to_pyvista, to_pyvista
 
 
 class _RepairMixin:
+
+    def domains(self, expr=None, **kwargs):
+        """This mesh's self-decomposition into volumetric domains.
+
+        The mesh is read through its own self arrangement — a
+        :class:`trueform.CsgGraph` of one operand — whose overlap pockets
+        classify into domains; block ``k`` is domain ``ids[k]``, named
+        ``str(ids[k])``. See :meth:`trueform.CsgGraph.domains` for keyword
+        arguments (``exclude_outer_shell``, ``ignore_open_fragments``,
+        ``selection``).
+
+        Returns
+        -------
+        pyvista.MultiBlock
+        """
+        graph = tf.CsgGraph([self.to_mesh()])
+        return domains_to_pyvista(*graph.domains(expr, **kwargs))
 
     def polygon_arrangements(self, *, return_curves=False, **kwargs):
         """The mesh split at its own self-intersection curves.
