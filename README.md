@@ -161,6 +161,16 @@ correspondence requirement), `tfpv.align_icp(source, target, ...)`
 unordered 2-point segments are connected into polylines first — or around
 the `(paths, points)` pair any trueform curve producer returns.
 
+### Generators
+
+`tfpv.box(width, height, depth)`, `.sphere(radius)`,
+`.cylinder(radius, height)`, and `.plane(width, height)` build primitive
+meshes centered at the origin, into a fresh PolyData zero-copy from
+trueform's own arrays. Subdivision counts (`width_ticks`/`height_ticks`/
+`depth_ticks` on the box and plane, `stacks`/`segments` on the sphere,
+`segments` on the cylinder) and `dtype`/`index_dtype` are keyword-only
+options; trueform's own defaults apply when omitted.
+
 ### Examples
 
 ![A sphere fractured by a grid of cutters in one csg_graph expression, read back as exploded domain chunks](assets/hero_csg_fracture.png)

@@ -20,6 +20,7 @@ from ._accessor import TrueformAccessor
 from ._conversion import (curves_to_pyvista, domains_to_pyvista,
                           to_pyvista, to_trueform)
 from ._factory import CsgGraph, csg_graph, domains, mesh_arrangements
+from ._generators import box, cylinder, plane, sphere
 from ._io import read, write
 from ._pick import ClosestHit, RayHit, closest, pick
 from ._registration import (align_icp, align_knn, align_obb, align_rigid,
@@ -37,15 +38,19 @@ __all__ = [
     "align_obb",
     "align_rigid",
     "align_similarity",
+    "box",
     "chamfer_distance",
     "closest",
     "csg_graph",
     "curves_to_pyvista",
+    "cylinder",
     "domains",
     "domains_to_pyvista",
     "mesh_arrangements",
     "pick",
+    "plane",
     "read",
+    "sphere",
     "to_pyvista",
     "to_trueform",
     "tube",

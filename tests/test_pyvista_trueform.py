@@ -1120,6 +1120,60 @@ def test_tube_refuses_non_line_input():
         tfpv.tube(object(), radius=0.1)
 
 
+# -- generators ------------------------------------------------------------
+
+
+def test_generator_box_matches_trueform():
+    faces, points = tf.make_box_mesh(2.0, 1.0, 3.0)
+    mesh = tfpv.box(2.0, 1.0, 3.0)
+    assert mesh.n_points == 8
+    assert mesh.n_cells == 12
+    np.testing.assert_array_equal(mesh.regular_faces, faces)
+    np.testing.assert_array_equal(np.asarray(mesh.points), points)
+
+    sub_faces, sub_points = tf.make_box_mesh(2.0, 1.0, 3.0, 4, 2, 6)
+    sub_mesh = tfpv.box(2.0, 1.0, 3.0, width_ticks=4, height_ticks=2,
+                        depth_ticks=6)
+    np.testing.assert_array_equal(sub_mesh.regular_faces, sub_faces)
+    np.testing.assert_array_equal(np.asarray(sub_mesh.points), sub_points)
+
+
+def test_generator_plane_matches_trueform():
+    faces, points = tf.make_plane_mesh(10.0, 5.0)
+    mesh = tfpv.plane(10.0, 5.0)
+    assert mesh.n_points == 4
+    assert mesh.n_cells == 2
+    np.testing.assert_array_equal(mesh.regular_faces, faces)
+    np.testing.assert_array_equal(np.asarray(mesh.points), points)
+
+
+def test_generator_sphere_matches_trueform():
+    faces, points = tf.make_sphere_mesh(2.0, stacks=8, segments=8)
+    mesh = tfpv.sphere(2.0, stacks=8, segments=8)
+    np.testing.assert_array_equal(mesh.regular_faces, faces)
+    np.testing.assert_array_equal(np.asarray(mesh.points), points)
+
+    radii = np.linalg.norm(np.asarray(mesh.points), axis=1)
+    np.testing.assert_allclose(radii, 2.0, rtol=1e-6)
+
+
+def test_generator_cylinder_matches_trueform():
+    faces, points = tf.make_cylinder_mesh(1.0, 2.0, segments=12)
+    mesh = tfpv.cylinder(1.0, 2.0, segments=12)
+    np.testing.assert_array_equal(mesh.regular_faces, faces)
+    np.testing.assert_array_equal(np.asarray(mesh.points), points)
+
+    z = np.asarray(mesh.points)[:, 2]
+    assert z.min() == pytest.approx(-1.0)
+    assert z.max() == pytest.approx(1.0)
+
+
+def test_generators_forward_dtype():
+    mesh = tfpv.sphere(1.0, dtype=np.float64, index_dtype=np.int64)
+    assert mesh.points.dtype == np.float64
+    assert mesh.regular_faces.dtype == np.int64
+
+
 # -- examples ------------------------------------------------------------
 
 
