@@ -7,34 +7,54 @@ isocontours and isobands, and N-ary CSG on [PyVista](https://pyvista.org)
 meshes. PyVista in, PyVista out, through one `.trueform` accessor on
 `pyvista.PolyData`.
 
-## Installation
+## Getting Started
 
 ```bash
 pip install pyvista-trueform
 ```
 
-## Quick Tour
+**The accessor** registers itself on import and answers through
+`.trueform` on any `pyvista.PolyData`:
 
 ```python
 import pyvista as pv
 import pyvista_trueform  # registers the accessor
 
-a = pv.Cube()
-b = pv.Cube(center=(0.5, 0.5, 0.5))
-a.trueform.union(b).plot()
+pv.Cube().trueform.volume()
 ```
 
-Every operation returns a fresh `pv.PolyData`; trueform's label arrays ride
-along as cell data (`trueform_labels`, `trueform_face_labels`). The accessor
-converts the dataset into a `trueform.Mesh` once and caches it keyed by the
-dataset's VTK modification time, so trueform's lazily built structures
-(spatial tree, face membership, edge link) amortize across calls. When the
-dataset changes, the next call rebuilds the mesh from scratch.
+**The cache** is whole-value: the accessor converts a dataset into a
+`trueform.Mesh` once and caches it keyed by the dataset's VTK modification
+time, so trueform's lazily built structures (spatial tree, face membership,
+edge link) amortize across calls, and every operation that returns geometry
+returns a fresh `pv.PolyData` with trueform's label arrays riding along as
+cell data (`trueform_labels`, `trueform_face_labels`); when the dataset
+changes, the next call rebuilds the mesh from scratch. One VTK pitfall:
+mutating a raw NumPy view of the underlying arrays does not advance the
+modification time, so the accessor would keep serving the stale mesh — call
+`polydata.Modified()` after such edits, since assignments through PyVista's
+own surface notify VTK already.
 
-One VTK gotcha: mutating a raw NumPy view of the underlying arrays does not
-advance the modification time, so the accessor would keep serving the stale
-mesh. Call `polydata.Modified()` after such edits; assignments through
-PyVista's own surface notify VTK already.
+**A worked example** — a boolean carves the shape, `domains` reads the
+pieces the arrangement made, and `pick` names the one a ray struck:
+
+```python
+import numpy as np
+import pyvista as pv
+import pyvista_trueform as tfpv
+import trueform as tf
+
+a = pv.Cube()
+b = pv.Cube(center=(0.5, 0.5, 0.5))
+
+carved = a.trueform.difference(b)               # boolean
+blocks = tfpv.domains([a, b])                    # every overlap pocket, its own block
+ray = tf.Ray(origin=np.array([-2, 0, 0], dtype=np.float32),
+            direction=np.array([1, 0, 0], dtype=np.float32))
+hit = tfpv.pick(blocks, ray)                      # hit.block_index names which one
+```
+
+The sections below cover the rest of the surface these three lean on.
 
 ### N-ary CSG
 
