@@ -338,6 +338,22 @@ def test_accessor_domains_self_decomposition():
         assert block.trueform.is_closed()
 
 
+def test_accessor_domains_return_source_ids_and_index_map():
+    soup = _two_cubes_concatenated()
+
+    blocks, tag_blocks, face_blocks = soup.trueform.domains(
+        return_source_ids=True)
+    assert blocks.n_blocks == 3
+    assert len(tag_blocks.offsets) == blocks.n_blocks + 1
+    assert face_blocks.offsets[-1] == sum(
+        block.n_cells for block in blocks)
+
+    blocks2, index_map = soup.trueform.domains(return_index_map=True)
+    assert blocks2.n_blocks == 3
+    assert index_map.n_tags == 1  # one operand: the soup itself
+    assert len(index_map.face_blocks.offsets) - 1 == blocks2.n_blocks
+
+
 def test_accessor_isocontours_and_isobands():
     sphere = pv.Sphere()
     sphere.point_data["height"] = np.asarray(sphere.points)[:, 2].copy()
@@ -370,6 +386,27 @@ def test_accessor_cleaned():
     merged = soup.trueform.cleaned()
     assert merged.n_points == 4
     assert merged.n_cells == 2
+
+
+def test_accessor_cleaned_return_index_map():
+    points = np.array(
+        [[0, 0, 0], [1, 0, 0], [0, 1, 0],
+         [1, 0, 0], [1, 1, 0], [0, 1, 0]],  # two vertices duplicated
+        dtype=np.float32)
+    soup = _polydata(points, [[0, 1, 2], [3, 4, 5]])
+
+    merged, face_map, point_map = soup.trueform.cleaned(
+        return_index_map=True)
+    assert merged.n_points == 4
+    assert merged.n_cells == 2
+    face_f, face_kept = face_map
+    np.testing.assert_array_equal(face_f, [0, 1])
+    np.testing.assert_array_equal(face_kept, [0, 1])
+    point_f, point_kept = point_map
+    assert len(point_kept) == merged.n_points
+    # points[1] and points[3] are the same duplicate, likewise [2] and [5].
+    assert point_f[1] == point_f[3]
+    assert point_f[2] == point_f[5]
 
 
 def test_accessor_triangulated():
@@ -687,6 +724,23 @@ def test_csg_graph_readers_answer_in_pyvista_types():
     assert isinstance(curves, pv.PolyData)
     assert curves.GetNumberOfLines() > 0
     assert curves.GetNumberOfPolys() == 0
+
+
+def test_csg_graph_domains_return_source_ids_and_index_map():
+    a = _cube()
+    b = _cube(center=(0.5, 0.5, 0.5))
+    graph = tfpv.csg_graph([a, b])
+
+    blocks, tag_blocks, face_blocks = graph.domains(return_source_ids=True)
+    assert blocks.n_blocks == 3
+    assert len(tag_blocks.offsets) == blocks.n_blocks + 1
+    assert face_blocks.offsets[-1] == sum(
+        block.n_cells for block in blocks)
+
+    blocks2, index_map = graph.domains(return_index_map=True)
+    assert blocks2.n_blocks == 3
+    assert index_map.n_tags == 2  # two operands
+    assert len(index_map.face_blocks.offsets) - 1 == blocks2.n_blocks
 
 
 def test_csg_graph_outer_shell():

@@ -117,14 +117,27 @@ class CsgGraph:
 
         Block ``k`` is domain ``ids[k]``, named ``str(ids[k])``. See
         :meth:`trueform.CsgGraph.domains` for keyword arguments
-        (``exclude_outer_shell``, ``ignore_open_fragments``,
-        ``selection``).
+        (``selection``, ``exclude_outer_shell``, ``ignore_open_fragments``,
+        ``return_source_ids``, ``return_index_map``). With
+        ``return_source_ids=True`` also returns per-cell face provenance as
+        two :class:`trueform.OffsetBlockedArray`, parallel to the block
+        list, passed through untouched; with ``return_index_map=True``
+        returns ``(multiblock, index_map)``, the
+        :class:`trueform.DomainsIndexMap` passed through untouched.
 
         Returns
         -------
         pyvista.MultiBlock
         """
-        return domains_to_pyvista(*self._graph.domains(expr, **kwargs))
+        result = self._graph.domains(expr, **kwargs)
+        if kwargs.get("return_index_map"):
+            cells, ids, index_map = result
+            return domains_to_pyvista(cells, ids), index_map
+        if kwargs.get("return_source_ids"):
+            cells, ids, tag_blocks, face_blocks = result
+            return domains_to_pyvista(cells, ids), tag_blocks, face_blocks
+        cells, ids = result
+        return domains_to_pyvista(cells, ids)
 
     def intersection_curves(self):
         """The arrangement's intersection curves as a line-only PolyData.
