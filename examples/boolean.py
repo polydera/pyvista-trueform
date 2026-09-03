@@ -29,7 +29,7 @@ def _cutter(center):
 
 
 def compute(center=CENTER):
-    base = pv.Cube().triangulate()
+    base = pv.Cube()
     carved = base.trueform.difference(_cutter(center))
     return base, carved
 

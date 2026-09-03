@@ -17,8 +17,8 @@ pip install pyvista-trueform
 import pyvista as pv
 import pyvista_trueform  # registers the accessor
 
-a = pv.Cube().triangulate()
-b = pv.Cube(center=(0.5, 0.5, 0.5)).triangulate()
+a = pv.Cube()
+b = pv.Cube(center=(0.5, 0.5, 0.5))
 a.trueform.union(b).plot()
 ```
 

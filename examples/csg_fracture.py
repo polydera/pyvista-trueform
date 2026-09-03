@@ -29,7 +29,7 @@ def _slab(axis, offset):
     center = [0.0, 0.0, 0.0]
     center[axis] = offset
     return pv.Cube(center=center, x_length=lengths[0], y_length=lengths[1],
-                   z_length=lengths[2]).triangulate()
+                   z_length=lengths[2])
 
 
 def compute(cuts_per_axis=2):

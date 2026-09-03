@@ -288,9 +288,8 @@ def test_accessor_booleans():
 
 
 def test_accessor_boolean_forwards_sheets():
-    cube = pv.Cube().triangulate()
-    sheet = pv.Plane(i_size=2, j_size=2,
-                     i_resolution=1, j_resolution=1).triangulate()
+    cube = pv.Cube()
+    sheet = pv.Plane(i_size=2, j_size=2, i_resolution=1, j_resolution=1)
     result = cube.trueform.difference(sheet, sheets=[1])
     assert result.volume == pytest.approx(0.5)
     assert result.trueform.is_closed()
@@ -308,9 +307,8 @@ def test_typo_option_raises_typeerror_at_our_signature(call, typo):
     """Every option is a named parameter, so a typo is a TypeError at OUR
     signature naming the unexpected argument — never silently swallowed
     by a bare **kwargs."""
-    cube = pv.Cube().triangulate()
-    sheet = pv.Plane(i_size=2, j_size=2,
-                     i_resolution=1, j_resolution=1).triangulate()
+    cube = pv.Cube()
+    sheet = pv.Plane(i_size=2, j_size=2, i_resolution=1, j_resolution=1)
     with pytest.raises(TypeError, match=typo):
         call(cube, sheet)
 
@@ -493,13 +491,13 @@ def test_accessor_measurements_exact():
 
 
 def test_accessor_euler_characteristic():
-    sphere = pv.Sphere().triangulate()
+    sphere = pv.Sphere()
     assert sphere.trueform.euler_characteristic() == 2
 
-    plane = pv.Plane(i_resolution=3, j_resolution=3).triangulate()
+    plane = pv.Plane(i_resolution=3, j_resolution=3)  # quad-faced
     assert plane.trueform.euler_characteristic() == 1
 
-    torus = pv.ParametricTorus(u_res=10, v_res=10).triangulate()
+    torus = pv.ParametricTorus(u_res=10, v_res=10)
     assert torus.trueform.euler_characteristic() == 0
 
 
@@ -655,7 +653,7 @@ def test_accessor_curvatures_and_shape_index():
 
 
 def test_accessor_boundary_curves_of_plane():
-    plane = pv.Plane(i_resolution=1, j_resolution=1).triangulate()
+    plane = pv.Plane(i_resolution=1, j_resolution=1)  # one quad face
     curves = plane.trueform.boundary_curves()
     assert curves.GetNumberOfLines() == 1
     assert curves.n_points == 4
@@ -967,7 +965,7 @@ def test_closest_point_query_names_the_block():
 
 def test_closest_mesh_query_gap():
     probe = pv.Cube(center=(4.0, 0.0, 0.0), x_length=0.5, y_length=0.5,
-                    z_length=0.5).triangulate()
+                    z_length=0.5)
     hit = tfpv.closest(_two_far_cubes_multiblock(), probe)
     assert hit.block_index == 1
     assert hit.distance == 0.25  # gap from x=3.5 to the probe at x=3.75
