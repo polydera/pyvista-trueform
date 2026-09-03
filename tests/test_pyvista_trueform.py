@@ -639,10 +639,19 @@ def test_csg_graph_end_to_end():
     assert full.n_cells >= union.n_cells
 
 
-def test_csg_graph_refuses_quads_with_pyvista_wording():
-    quads = pv.Plane(i_resolution=2, j_resolution=2)
-    with pytest.raises(ValueError, match=r"\.triangulate\(\)"):
-        tfpv.csg_graph([quads, _cube()])
+def test_csg_graph_accepts_non_triangle_operands():
+    a = pv.Cube()  # quad-faced, no .triangulate()
+    b = pv.Cube(center=(0.5, 0.0, 0.0))  # quad-faced
+    quad_graph = tfpv.csg_graph([a, b])
+    quad_union = quad_graph.mesh(tf.op(0) | tf.op(1))
+    assert quad_union.volume == pytest.approx(1.5, rel=1e-4)
+    assert quad_union.trueform.is_closed()
+
+    c = pv.Cube(center=(0.5, 0.0, 0.0)).triangulate()  # mixed tri + quad
+    mixed_graph = tfpv.csg_graph([a, c])
+    mixed_union = mixed_graph.mesh(tf.op(0) | tf.op(1))
+    assert mixed_union.volume == pytest.approx(1.5, rel=1e-4)
+    assert mixed_union.trueform.is_closed()
 
 
 def test_csg_graph_operands_reuse_accessor_cache():
@@ -698,6 +707,14 @@ def test_mesh_arrangements_labeled():
     with_curves, curves = tfpv.mesh_arrangements([a, b], return_curves=True)
     assert with_curves.n_cells == arranged.n_cells
     assert curves.GetNumberOfLines() > 0
+
+
+def test_mesh_arrangements_accepts_non_triangle_operands():
+    a = pv.Cube()  # quad-faced
+    b = _cube(center=(0.5, 0.5, 0.5))  # triangulated
+    arranged = tfpv.mesh_arrangements([a, b])
+    assert arranged.n_cells > 0
+    assert set(np.unique(arranged.cell_data["trueform_labels"])) == {0, 1}
 
 
 def test_domains_of_two_cubes():

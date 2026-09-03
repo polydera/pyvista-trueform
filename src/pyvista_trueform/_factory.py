@@ -7,7 +7,7 @@ Commercial licensing available via info@polydera.com.
 https://github.com/polydera/pyvista-trueform
 """
 
-import pyvista as pv
+import numpy as np
 import trueform as tf
 
 from ._accessor import _operand_mesh
@@ -21,6 +21,46 @@ def _labeled(mesh, labels=None, face_labels=None):
     if face_labels is not None:
         result.cell_data["trueform_face_labels"] = face_labels
     return result
+
+
+def _carrying_transformation(mesh, source):
+    if source.transformation is not None:
+        mesh.transformation = source.transformation
+    return mesh
+
+
+def _as_dynamic(mesh):
+    """The same mesh with triangle faces re-expressed as dynamic blocks."""
+    return _carrying_transformation(
+        tf.Mesh(tf.as_offset_blocked(mesh.faces), mesh.points), mesh)
+
+
+def _widened(mesh):
+    """The same mesh with its faces widened to int64."""
+    if mesh.is_dynamic:
+        faces = tf.OffsetBlockedArray(mesh.faces.offsets.astype(np.int64),
+                                      mesh.faces.data.astype(np.int64))
+    else:
+        faces = mesh.faces.astype(np.int64)
+    return _carrying_transformation(tf.Mesh(faces, mesh.points), mesh)
+
+
+def _normalized_operands(meshes):
+    """Meshes ready for one arrangement build: one representation and one
+    index dtype, generalizing trueform's own pairwise boolean
+    ``_normalized_pair`` (``python/src/trueform/_csg/boolean.py``) to N
+    operands. All-triangle stays triangle; anything else re-expresses every
+    operand as dynamic blocks, losslessly. A differing index dtype widens
+    every operand to int64.
+    """
+    if not all(mesh.ngon == 3 and not mesh.is_dynamic for mesh in meshes):
+        meshes = [mesh if mesh.is_dynamic else _as_dynamic(mesh)
+                 for mesh in meshes]
+    wide = np.dtype(np.int64)
+    if len({mesh.faces.dtype for mesh in meshes}) > 1:
+        meshes = [mesh if mesh.faces.dtype == wide else _widened(mesh)
+                 for mesh in meshes]
+    return meshes
 
 
 class CsgGraph:
@@ -120,13 +160,16 @@ def csg_graph(datasets, **kwargs):
     answered against it — in PyVista types:
     ``csg_graph([a, b, c]).mesh(tf.op(0) - tf.op(1)).plot()``. Each dataset
     converts through its own accessor cache; a :class:`trueform.Mesh`
-    operand passes through as-is. Operands must be triangle meshes
-    (``dataset.triangulate()`` first if needed).
+    operand passes through as-is. Operands stay a triangle graph when every
+    one is all-triangle; otherwise every operand is re-expressed as dynamic
+    (variable-sized) faces first — lossless, mirroring how trueform's own
+    booleans normalize a mixed pair. A single operand is legal: its own
+    self arrangement.
 
     Parameters
     ----------
     datasets : sequence of pyvista.PolyData or trueform.Mesh
-        The operands. A single operand is legal: its own self arrangement.
+        The operands.
     **kwargs
         Forwarded to :class:`trueform.CsgGraph` (``sheets``, ``mode``,
         ``tolerance``, ``resolve_crossings``, ``within``,
@@ -136,13 +179,9 @@ def csg_graph(datasets, **kwargs):
     -------
     CsgGraph
     """
-    for i, dataset in enumerate(datasets):
-        if isinstance(dataset, pv.PolyData) and not dataset.is_all_triangles:
-            raise ValueError(
-                f"operand {i} is not all triangles; "
-                "call .triangulate() on it first")
-    return CsgGraph(tf.CsgGraph(
-        [_operand_mesh(dataset) for dataset in datasets], **kwargs))
+    meshes = _normalized_operands([_operand_mesh(dataset)
+                                   for dataset in datasets])
+    return CsgGraph(tf.CsgGraph(meshes, **kwargs))
 
 
 def mesh_arrangements(datasets, **kwargs):
@@ -151,19 +190,22 @@ def mesh_arrangements(datasets, **kwargs):
     Every face is split along every intersection curve; the source mesh of
     each output face rides as ``trueform_labels``, its source face as
     ``trueform_face_labels``. With ``return_curves=True`` also returns the
-    intersection curves as a second, line-only PolyData. See
+    intersection curves as a second, line-only PolyData. Operands stay a
+    triangle mesh when every one is all-triangle; otherwise every operand
+    is re-expressed as dynamic faces first, as in :func:`csg_graph`. See
     :func:`trueform.mesh_arrangements` for keyword arguments.
 
     Parameters
     ----------
     datasets : sequence of pyvista.PolyData or trueform.Mesh
-        The operands, at least two triangle meshes.
+        The operands, two or more.
 
     Returns
     -------
     pyvista.PolyData
     """
-    meshes = [_operand_mesh(dataset) for dataset in datasets]
+    meshes = _normalized_operands([_operand_mesh(dataset)
+                                   for dataset in datasets])
     result = tf.mesh_arrangements(meshes, **kwargs)
     if kwargs.get("return_curves"):
         mesh, tag_labels, face_labels, curves = result
