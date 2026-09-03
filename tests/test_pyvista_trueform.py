@@ -671,6 +671,19 @@ def test_csg_graph_readers_answer_in_pyvista_types():
     assert curves.GetNumberOfPolys() == 0
 
 
+def test_csg_graph_outer_shell():
+    a = _cube()
+    b = _cube(center=(0.5, 0.5, 0.5))
+    graph = tfpv.csg_graph([a, b])
+
+    shell = graph.outer_shell()
+    assert isinstance(shell, pv.PolyData)
+    assert shell.trueform.is_closed()
+    union_volume = graph.mesh(tf.op(0) | tf.op(1)).volume
+    assert union_volume == pytest.approx(1.875, rel=1e-4)
+    assert shell.volume == pytest.approx(union_volume, rel=1e-4)
+
+
 # -- arrangements and domains --------------------------------------------
 
 

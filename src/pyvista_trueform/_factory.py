@@ -98,6 +98,20 @@ class CsgGraph:
         """
         return curves_to_pyvista(self._graph.intersection_curves())
 
+    def outer_shell(self):
+        """The arrangement's outer shell as a PyVista PolyData.
+
+        The boundary between the unbounded universe and everything the
+        operands enclose, oriented outward — a structural read off the
+        graph already built, no second arrangement. See
+        :meth:`trueform.CsgGraph.outer_shell`.
+
+        Returns
+        -------
+        pyvista.PolyData
+        """
+        return to_pyvista(self._graph.outer_shell())
+
 
 def csg_graph(datasets, **kwargs):
     """Build a :class:`CsgGraph` over PyVista datasets.
