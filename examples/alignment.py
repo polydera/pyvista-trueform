@@ -2,7 +2,7 @@
 Registration recovering a known motion
 
 A surface is moved by a known rotation and translation, then registered
-back onto the original with align(method="rigid") — the moved copy keeps
+back onto the original with align_rigid() — the moved copy keeps
 point-to-point correspondence, which is exactly what the rigid (Kabsch)
 fit wants. The chamfer distance before and after shows the recovery, and
 the three surfaces render together.
@@ -16,7 +16,7 @@ https://github.com/polydera/pyvista-trueform
 import numpy as np
 import pyvista as pv
 
-from pyvista_trueform import align, chamfer_distance
+from pyvista_trueform import align_rigid, chamfer_distance
 
 
 def _applied(matrix, points):
@@ -35,7 +35,7 @@ def compute():
     moved.points = _applied(motion, np.asarray(target.points))
 
     before = chamfer_distance(moved, target)
-    recovered = align(moved, target, method="rigid")
+    recovered = align_rigid(moved, target)
     aligned = moved.copy()
     aligned.points = _applied(recovered, np.asarray(moved.points))
     after = chamfer_distance(aligned, target)

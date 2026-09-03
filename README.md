@@ -122,9 +122,15 @@ this package names "distance" is euclidean.
 
 ### Registration
 
-`tfpv.align(source, target, method=...)` fits a 4x4 world-to-world matrix
-(`"rigid"`, `"similarity"`, `"icp"`, `"obb"`, `"knn"`) over any
-point-bearing datasets or arrays, ready for `dataset.transform`;
+Five named functions, one per trueform fit, each taking only its own
+callee's options over any point-bearing datasets or arrays and returning a
+4x4 world-to-world matrix ready for `dataset.transform`:
+`tfpv.align_rigid(source, target)` (Kabsch, correspondence required),
+`tfpv.align_similarity(source, target)` (+ uniform scale, same
+correspondence requirement), `tfpv.align_icp(source, target, ...)`
+(iterative closest point), `tfpv.align_obb(source, target, ...)`
+(oriented-bounding-box, no correspondences), and
+`tfpv.align_knn(source, target, ...)` (one soft-correspondence step).
 `tfpv.chamfer_distance(a, b)` is the one-way chamfer measure.
 
 ### Tubes
@@ -151,7 +157,7 @@ gallery ships in the Polydera color scheme through the shared
   across a hills surface, from one `principal_curvatures` call each.
 - `remesh_and_simplify.py` — remeshed, decimated, and simplified side by
   side.
-- `alignment.py` — a transformed copy registered back with `align`,
+- `alignment.py` — a transformed copy registered back with `align_rigid`,
   chamfer distance before and after.
 - `raycast_depth.py` — an orthographic depth image from one batched
   `tf.Ray` cast.

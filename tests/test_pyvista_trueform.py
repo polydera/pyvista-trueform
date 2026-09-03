@@ -1033,7 +1033,7 @@ def test_align_rigid_recovers_known_transform():
     moved = sphere.copy()
     moved.points = _applied(truth, np.asarray(sphere.points))
 
-    recovered = tfpv.align(moved, sphere, method="rigid")
+    recovered = tfpv.align_rigid(moved, sphere)
     assert recovered.shape == (4, 4)
     # Corresponding points, so the recovered delta is the exact inverse.
     np.testing.assert_allclose(
@@ -1049,7 +1049,7 @@ def test_align_similarity_recovers_known_scale():
     moved = sphere.copy()
     moved.points = _applied(truth, np.asarray(sphere.points))
 
-    recovered = tfpv.align(moved, sphere, method="similarity")
+    recovered = tfpv.align_similarity(moved, sphere)
     assert recovered.shape == (4, 4)
     recovered_scale = np.linalg.det(recovered[:3, :3]) ** (1 / 3)
     assert recovered_scale == pytest.approx(1.0 / scale, rel=1e-4)
@@ -1058,24 +1058,19 @@ def test_align_similarity_recovers_known_scale():
         np.asarray(sphere.points), atol=1e-4)
 
 
-@pytest.mark.parametrize("method,tolerance", [("icp", 0.01), ("obb", 1e-4),
-                                              ("knn", 0.01)])
-def test_align_correspondence_free_methods(method, tolerance):
+@pytest.mark.parametrize("align_fn,tolerance", [
+    (tfpv.align_icp, 0.01), (tfpv.align_obb, 1e-4), (tfpv.align_knn, 0.01)])
+def test_align_correspondence_free_methods(align_fn, tolerance):
     points = _elongated_cloud()
     degrees, shift = (20.0, [0.4, -0.3, 0.2])
-    if method == "knn":  # one soft-correspondence step: small motion only
-        degrees, shift = (0.0, [0.05, 0.02, 0.03])
+    if align_fn is tfpv.align_knn:  # one soft-correspondence step: small
+        degrees, shift = (0.0, [0.05, 0.02, 0.03])       # motion only
     truth = _rotation_translation(degrees, shift, np.float32)
     moved = _applied(truth, points)
 
-    recovered = tfpv.align(moved, points, method=method)
+    recovered = align_fn(moved, points)
     assert tfpv.chamfer_distance(
         _applied(recovered, moved), points) < tolerance
-
-
-def test_align_refuses_unknown_method():
-    with pytest.raises(ValueError, match="supported"):
-        tfpv.align(pv.Sphere(), pv.Sphere(), method="banana")
 
 
 def test_chamfer_distance_exact_shift():
