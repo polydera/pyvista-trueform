@@ -287,6 +287,15 @@ def test_accessor_booleans():
     assert reverse.volume == pytest.approx(0.875, rel=1e-4)
 
 
+def test_accessor_boolean_forwards_sheets():
+    cube = pv.Cube().triangulate()
+    sheet = pv.Plane(i_size=2, j_size=2,
+                     i_resolution=1, j_resolution=1).triangulate()
+    result = cube.trueform.difference(sheet, sheets=[1])
+    assert result.volume == pytest.approx(0.5)
+    assert result.trueform.is_closed()
+
+
 def test_accessor_boolean_curves():
     a = _cube()
     b = _cube(center=(0.5, 0.5, 0.5))

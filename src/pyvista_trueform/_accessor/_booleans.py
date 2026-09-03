@@ -15,9 +15,9 @@ from . import _operand_mesh
 
 class _BooleansMixin:
 
-    def _boolean(self, operation, other, return_curves):
+    def _boolean(self, operation, other, return_curves, **kwargs):
         result = operation(self.to_mesh(), _operand_mesh(other),
-                           return_curves=return_curves)
+                           return_curves=return_curves, **kwargs)
         if return_curves:
             mesh, labels, face_labels, curves = result
             return (self._labeled(mesh, labels, face_labels),
@@ -25,26 +25,29 @@ class _BooleansMixin:
         mesh, labels, face_labels = result
         return self._labeled(mesh, labels, face_labels)
 
-    def union(self, other, *, return_curves=False):
+    def union(self, other, *, return_curves=False, **kwargs):
         """Boolean union with ``other`` (PolyData or trueform Mesh).
 
         With ``return_curves=True`` also returns the intersection curves as
-        a second, line-only PolyData. See :func:`trueform.boolean_union`.
+        a second, line-only PolyData. Remaining keyword arguments forward to
+        :func:`trueform.boolean_union` (e.g. ``sheets``).
         """
-        return self._boolean(tf.boolean_union, other, return_curves)
+        return self._boolean(tf.boolean_union, other, return_curves, **kwargs)
 
-    def intersection(self, other, *, return_curves=False):
+    def intersection(self, other, *, return_curves=False, **kwargs):
         """Boolean intersection with ``other`` (PolyData or trueform Mesh).
 
         See :func:`trueform.boolean_intersection`.
         """
-        return self._boolean(tf.boolean_intersection, other, return_curves)
+        return self._boolean(tf.boolean_intersection, other, return_curves,
+                             **kwargs)
 
-    def difference(self, other, *, return_curves=False):
+    def difference(self, other, *, return_curves=False, **kwargs):
         """Boolean difference: this mesh minus ``other``.
 
         The other direction is the other dataset's accessor:
         ``other.trueform.difference(this)``. See
         :func:`trueform.boolean_difference`.
         """
-        return self._boolean(tf.boolean_difference, other, return_curves)
+        return self._boolean(tf.boolean_difference, other, return_curves,
+                             **kwargs)
