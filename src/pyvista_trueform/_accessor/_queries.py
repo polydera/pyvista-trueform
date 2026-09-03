@@ -70,6 +70,24 @@ class _QueriesMixin:
         return tf.distance(self.to_mesh(),
                            tf.Point(self._query_point(other, "other")))
 
+    def signed_distance(self, other):
+        """Signed distance from every point of this dataset to ``other``.
+
+        Negative inside ``other``, positive outside; the magnitude is the
+        euclidean distance to its surface. ``other`` is a PolyData or
+        trueform Mesh with outward-oriented faces. This dataset's points
+        go as one batched :class:`trueform.Point`, so a points-only
+        dataset queries just as well as a faced one.
+
+        Returns the ``(N,)`` array in the target's dtype — attach it with
+        ``dataset.point_data["d"] = dataset.trueform.signed_distance(other)``.
+        See :func:`trueform.signed_distance`.
+        """
+        target = _operand_mesh(other)
+        points = np.asarray(self._dataset.points)
+        return tf.signed_distance(target, tf.Point(
+            np.ascontiguousarray(points.astype(target.dtype, copy=False))))
+
     def intersects(self, other):
         """True when this mesh intersects ``other`` (PolyData or trueform
         Mesh). See :func:`trueform.intersects`.

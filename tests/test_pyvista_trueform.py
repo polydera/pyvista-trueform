@@ -416,6 +416,20 @@ def test_accessor_measurements_exact():
     assert cube.trueform.area() == 6.0
 
 
+def test_accessor_signed_distance_known_values():
+    cube = _cube()  # extent [-0.5, 0.5], float32
+    queries = pv.PolyData(
+        np.array([[0.0, 0.0, 0.0], [2.0, 0.0, 0.0]], dtype=np.float64))
+
+    result = queries.trueform.signed_distance(cube)
+    np.testing.assert_allclose(result, [-0.5, 1.5])
+    assert result.dtype == cube.points.dtype
+
+    # A trueform.Mesh target works the same as a PolyData one.
+    mesh_result = queries.trueform.signed_distance(cube.trueform.to_mesh())
+    np.testing.assert_array_equal(mesh_result, result)
+
+
 def test_accessor_ray_cast_known_hit():
     cube = _cube(center=(3.0, 0.0, 0.0))  # near face at x = 2.5
     face_id, t = cube.trueform.ray_cast(

@@ -22,7 +22,7 @@ keywords = [
   "computational-geometry",
 ]
 dependencies = [
-  "trueform>=0.10.0",
+  "trueform>=0.10.2",
   "pyvista>=0.48",
   "numpy>=1.23",
 ]
