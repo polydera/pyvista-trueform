@@ -156,6 +156,12 @@ gallery ships in the Polydera color scheme through the shared
 - `raycast_depth.py` — an orthographic depth image from one batched
   `tf.Ray` cast.
 
+### Benchmark
+
+`accessor.triangulated()` runs over 2x faster than PyVista's own
+`.triangulate()` on a million-quad plane, first call, conversion
+included (`benchmarks/triangulate.py`, medians of 5).
+
 ### Coming with trueform 0.11
 
 Orientation verdicts (`orient_faces_consistently`,
