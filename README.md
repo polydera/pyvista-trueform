@@ -23,17 +23,21 @@ import pyvista_trueform  # registers the accessor
 pv.Cube().trueform.volume()
 ```
 
-**The cache** is whole-value: the accessor converts a dataset into a
-`trueform.Mesh` once and caches it keyed by the dataset's VTK modification
-time, so trueform's lazily built structures (spatial tree, face membership,
-edge link) amortize across calls, and every operation that returns geometry
-returns a fresh `pv.PolyData` with trueform's label arrays riding along as
-cell data (`trueform_labels`, `trueform_face_labels`); when the dataset
-changes, the next call rebuilds the mesh from scratch. One VTK pitfall:
-mutating a raw NumPy view of the underlying arrays does not advance the
-modification time, so the accessor would keep serving the stale mesh — call
-`polydata.Modified()` after such edits, since assignments through PyVista's
-own surface notify VTK already.
+**The cache** is whole-value, keyed by the dataset's VTK modification
+time — the held instance is what lets trueform's spatial tree, face
+membership, and edge link build lazily once:
+
+```python
+import numpy as np
+
+a = pv.Cube()
+mesh = a.trueform.to_mesh()
+assert a.trueform.to_mesh() is mesh  # same cached instance, MTime unchanged
+
+np.asarray(a.points)[0] += 1.0       # raw mutation: MTime NOT bumped
+a.Modified()                         # tell VTK, so the cache rebuilds
+assert a.trueform.to_mesh() is not mesh
+```
 
 **A worked example** — a boolean carves the shape, `domains` reads the
 pieces the arrangement made, and `pick` names the one a ray struck:
@@ -47,11 +51,13 @@ import trueform as tf
 a = pv.Cube()
 b = pv.Cube(center=(0.5, 0.5, 0.5))
 
-carved = a.trueform.difference(b)               # boolean
-blocks = tfpv.domains([a, b])                    # every overlap pocket, its own block
+carved = a.trueform.difference(b)
+carved.cell_data["trueform_labels"]  # per-face source: 0 (a) or 1 (b)
+blocks = tfpv.domains([a, b])        # every overlap pocket, its own block
 ray = tf.Ray(origin=np.array([-2, 0, 0], dtype=np.float32),
             direction=np.array([1, 0, 0], dtype=np.float32))
-hit = tfpv.pick(blocks, ray)                      # hit.block_index names which one
+hit = tfpv.pick(blocks, ray)
+hit.block_index                      # which block the ray struck
 ```
 
 The sections below cover the rest of the surface these three lean on.
@@ -62,114 +68,138 @@ Build one arrangement of N operands and answer arbitrarily many boolean
 expressions against it:
 
 ```python
-import trueform as tf
 from pyvista_trueform import csg_graph
 
+c = pv.Cube(center=(0.25, 0.5, 0.0))  # quads, mixed ngons: normalized losslessly
 graph = csg_graph([a, b, c])
-graph.mesh(tf.op(0) - (tf.op(1) | tf.op(2))).plot()
+graph.mesh(tf.op(0) - (tf.op(1) | tf.op(2)))
+
+graph.domains()                       # every watertight piece, as a MultiBlock
+graph.intersection_curves()           # the seams, as line PolyData
+graph.outer_shell()                   # boundary of everything the operands enclose
+graph.native                          # escape hatch: the raw trueform.CsgGraph
+
+csg_graph([a])                        # one operand is legal: its own self arrangement
 ```
-
-Operands need not be triangulated: an all-triangle set stays a triangle
-graph, anything else (quads, mixed) is re-expressed as dynamic faces first,
-losslessly. A single operand is legal too — its own self arrangement.
-
-`graph.mesh(...)`, `graph.domains()`, `graph.intersection_curves()`, and
-`graph.outer_shell()` answer directly in PyVista types; the rest of the
-graph's surface (`created_points`, `forms`, the construction state) lives on
-`graph.native`, the underlying `trueform.CsgGraph`.
 
 ### Conversions
 
-`to_trueform(polydata)` copies polygon geometry into a detached
-`trueform.Mesh`; `to_pyvista(mesh_or_faces_points)` and
-`curves_to_pyvista(paths, points)` go the other way zero-copy — trueform's
-offset-block faces are exactly VTK 9's cell-array layout, and VTK retains
-the NumPy buffers. Everything trueform offers beyond the accessor's headline
-methods stays reachable by composition through these functions.
+`to_trueform` and `to_pyvista` cross the boundary; only `to_trueform`
+copies:
+
+```python
+from pyvista_trueform import to_trueform, to_pyvista, curves_to_pyvista
+
+mesh = to_trueform(a)                        # detached trueform.Mesh, copies the geometry
+to_pyvista(mesh)                             # zero-copy: shares mesh's own NumPy buffers
+curves_to_pyvista(tf.boundary_curves(mesh))  # any (paths, points) pair, zero-copy
+```
 
 ### IO
 
-`tfpv.read(path)` and `tfpv.write(path, dataset)` move meshes through
-trueform's parallel STL and OBJ readers and writers, dispatched on the path
-suffix; reading converts zero-copy, STL welds duplicate vertices on the way
-in.
+```python
+from pyvista_trueform import read, write
+
+write("cube.obj", a)                          # dispatched on suffix; .obj keeps a's own quad faces
+read("cube.obj")                              # zero-copy conversion back to PolyData
+
+write("cube.stl", a.trueform.triangulated())  # STL: triangles only
+read("cube.stl")                              # STL welds duplicate vertices on the way in
+```
 
 ### Domains and N-ary arrangements
 
-`tfpv.domains([a, b, c])` partitions space by every surface and returns each
-watertight volumetric domain as a block of a `pv.MultiBlock`, named by its
-domain id — pass a prebuilt `csg_graph(...)` and an expression to restrict
-it. `tfpv.mesh_arrangements([a, b, c])` returns the whole arrangement as one
-labeled PolyData instead. `mesh.trueform.domains()` does the one-mesh case
-directly: a mesh's own overlap pockets, from its self arrangement.
+```python
+from pyvista_trueform import domains, mesh_arrangements
+
+domains([a, b, c])            # every watertight domain, named by id, as a MultiBlock
+mesh_arrangements([a, b, c])  # the whole arrangement instead, as one labeled PolyData
+a.trueform.domains()          # one mesh's own overlap pockets, from its self arrangement
+```
 
 ### Picking
 
-`pick` and `closest` answer over any MultiBlock (nested ones flatten;
-plain PolyData works too, as block 0) — not just domains — and name WHICH
-block:
+`pick` and `closest` answer over any MultiBlock (nested ones flatten; a
+plain PolyData works too, as block 0):
 
 ```python
-import trueform as tf
-from pyvista_trueform import csg_graph, domains, pick
+from pyvista_trueform import pick, closest
 
 blocks = domains(csg_graph([a, b]))
-hit = pick(blocks, tf.Ray(origin=origin, direction=direction))
-# you picked block hit.block_index at hit.point
+ray = tf.Ray(origin=np.array([-2, 0, 0], dtype=np.float32),
+            direction=np.array([1, 0, 0], dtype=np.float32))
+pick(blocks, ray)                 # hit.block_index, hit.point: first block struck
+closest(blocks, [0.0, 0.0, 0.0])  # same shape, by proximity instead of a ray
 ```
-
-`closest(blocks, query)` does the same by proximity: the query is a point
-or a whole dataset/mesh (mesh-to-mesh through the witness-pair entry
-`.trueform.closest_point_pair(other)`), and the hit carries the witness
-point on the winning block and the euclidean distance.
 
 ### Remesh
 
-`mesh.trueform.remeshed(target_length)`, `.decimated(proportion)`, and
-`.simplified()` surface trueform's parallel isotropic remesher and
-quadric-error tiers — boundary-, feature- and region-aware
-(`preserve_regions` labels ride back as cell data).
+```python
+tri = a.trueform.triangulated()
+
+tri.trueform.remeshed(0.1)             # isotropic, target edge length
+tri.trueform.decimated(0.5)            # quadric-error, target face proportion
+tri.trueform.simplified()              # quadric-error, to an error budget instead
+
+labels = np.zeros(tri.n_cells, dtype=np.int32)
+remeshed = tri.trueform.remeshed(0.1, preserve_regions=labels)
+remeshed.cell_data["trueform_labels"]  # preserve_regions rides back as cell data
+```
 
 ### Queries
 
-`mesh.trueform.volume()`, `.area()`, `.euler_characteristic()`,
-`.ray_cast(ray, config=None)`, `.distance(other)`,
-`.signed_distance(other)`, `.intersects(other)`, `.closest_point(point)`,
-`.closest_point_pair(other)`, `.principal_curvatures()`, `.shape_index()`,
-and `.boundary_curves()` answer against the cached mesh, so the spatial
-tree amortizes across calls. Queries speak trueform primitives —
-`ray_cast` takes a `tf.Ray(origin=..., direction=...)`, `signed_distance`
-takes this dataset's own points as one batched query — and every value
-this package names "distance" is euclidean.
+```python
+a.trueform.volume()                  # .area(), .euler_characteristic() too
+a.trueform.distance(b)               # euclidean; .intersects(b) too
+a.trueform.signed_distance(b)        # negative inside b; batched over a's own points
+a.trueform.closest_point([0, 0, 0])  # (face_id, distance, point)
+a.trueform.closest_point_pair(b)     # witness pair between a and b
+a.trueform.principal_curvatures()    # (k0, k1); .shape_index() too
+a.trueform.boundary_curves()         # open edges, as line PolyData
+
+ray = tf.Ray(origin=np.array([-2, 0, 0], dtype=np.float32),
+            direction=np.array([1, 0, 0], dtype=np.float32))
+a.trueform.ray_cast(ray)             # (face_id, t); config=(min_t, max_t) bounds it
+```
+
+All of these answer against the cached mesh, so the spatial tree
+amortizes across calls.
 
 ### Registration
 
-Five named functions, one per trueform fit, each taking only its own
-callee's options over any point-bearing datasets or arrays and returning a
-4x4 world-to-world matrix ready for `dataset.transform`:
-`tfpv.align_rigid(source, target)` (Kabsch, correspondence required),
-`tfpv.align_similarity(source, target)` (+ uniform scale, same
-correspondence requirement), `tfpv.align_icp(source, target, ...)`
-(iterative closest point), `tfpv.align_obb(source, target, ...)`
-(oriented-bounding-box, no correspondences), and
-`tfpv.align_knn(source, target, ...)` (one soft-correspondence step).
-`tfpv.chamfer_distance(a, b)` is the one-way chamfer measure.
+```python
+from pyvista_trueform import (align_rigid, align_similarity, align_icp,
+                             align_obb, align_knn, chamfer_distance)
+
+align_rigid(a, b)       # Kabsch: rotation + translation, correspondence required
+align_similarity(a, b)  # + uniform scale, same correspondence requirement
+align_icp(a, b)         # iterative closest point, no correspondence needed
+align_obb(a, b)         # oriented-bounding-box alignment, no correspondence
+align_knn(a, b)         # one soft-correspondence step
+chamfer_distance(a, b)  # one-way chamfer measure
+```
+
+Each `align_*` returns a 4x4 world-to-world matrix ready for
+`dataset.transform`.
 
 ### Tubes
 
-`tfpv.tube(lines, radius)` sweeps a triangle tube around line PolyData —
-unordered 2-point segments are connected into polylines first — or around
-the `(paths, points)` pair any trueform curve producer returns.
+```python
+from pyvista_trueform import tube
+
+line = pv.Line((0, 0, 0), (1, 0, 0))
+tube(line, radius=0.1)  # triangle tube; unordered 2-point segments connect first
+```
 
 ### Generators
 
-`tfpv.box(width, height, depth)`, `.sphere(radius)`,
-`.cylinder(radius, height)`, and `.plane(width, height)` build primitive
-meshes centered at the origin, into a fresh PolyData zero-copy from
-trueform's own arrays. Subdivision counts (`width_ticks`/`height_ticks`/
-`depth_ticks` on the box and plane, `stacks`/`segments` on the sphere,
-`segments` on the cylinder) and `dtype`/`index_dtype` are keyword-only
-options; trueform's own defaults apply when omitted.
+```python
+tfpv.box(2.0, 1.0, 3.0)                                   # ticks subdivide each axis
+tfpv.sphere(1.0, stacks=20, segments=20)
+tfpv.cylinder(1.0, 2.0, segments=20)
+tfpv.plane(10.0, 5.0)                                     # ticks subdivide each axis
+tfpv.sphere(1.0, dtype=np.float64, index_dtype=np.int64)  # trueform's defaults apply when omitted
+```
 
 ### Examples
 
