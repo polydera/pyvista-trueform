@@ -161,14 +161,16 @@ class _QueriesMixin:
 
     def principal_curvatures(self, **kwargs):
         """Per-vertex principal curvatures ``(k0, k1)``; with
-        ``directions=True`` also ``(d0, d1)``. See
-        :func:`trueform.principal_curvatures` for keyword arguments.
+        ``directions=True`` also ``(d0, d1)``. ``k`` (default 2) sets the
+        k-ring neighborhood size for the curvature estimate. See
+        :func:`trueform.principal_curvatures` for details.
         """
         return tf.principal_curvatures(self.to_mesh(), **kwargs)
 
     def shape_index(self, **kwargs):
-        """Per-vertex shape index in ``[-1, 1]`` (cup to cap). See
-        :func:`trueform.shape_index` for keyword arguments.
+        """Per-vertex shape index in ``[-1, 1]`` (cup to cap). ``k``
+        (default 2) sets the k-ring neighborhood size for the underlying
+        curvature estimate. See :func:`trueform.shape_index` for details.
         """
         return tf.shape_index(self.to_mesh(), **kwargs)
 

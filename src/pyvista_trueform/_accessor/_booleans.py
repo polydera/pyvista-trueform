@@ -37,7 +37,11 @@ class _BooleansMixin:
     def intersection(self, other, *, return_curves=False, **kwargs):
         """Boolean intersection with ``other`` (PolyData or trueform Mesh).
 
-        See :func:`trueform.boolean_intersection`.
+        With ``return_curves=True`` also returns the intersection curves as
+        a second, line-only PolyData. Remaining keyword arguments forward
+        to :func:`trueform.boolean_intersection` (e.g. ``sheets``, operand
+        indices ``0``/``1`` declared as oriented separators that bound no
+        volume).
         """
         return self._boolean(tf.boolean_intersection, other, return_curves,
                              **kwargs)
@@ -46,8 +50,10 @@ class _BooleansMixin:
         """Boolean difference: this mesh minus ``other``.
 
         The other direction is the other dataset's accessor:
-        ``other.trueform.difference(this)``. See
-        :func:`trueform.boolean_difference`.
+        ``other.trueform.difference(this)``. With ``return_curves=True``
+        also returns the intersection curves as a second, line-only
+        PolyData. Remaining keyword arguments forward to
+        :func:`trueform.boolean_difference` (e.g. ``sheets``).
         """
         return self._boolean(tf.boolean_difference, other, return_curves,
                              **kwargs)

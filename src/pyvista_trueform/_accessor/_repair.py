@@ -48,7 +48,10 @@ class _RepairMixin:
         """The mesh split at its own self-intersection curves.
 
         Per-face provenance rides as ``trueform_face_labels``. See
-        :func:`trueform.polygon_arrangements` for keyword arguments.
+        :func:`trueform.polygon_arrangements` for the remaining keyword
+        arguments: ``mode`` ("primitives" or "sos"), ``tolerance``,
+        ``resolve_crossings``, ``resolve_self_crossings``, and
+        ``triangulation`` ("cdt" or "refined_cdt").
         """
         result = tf.polygon_arrangements(
             self.to_mesh(), return_curves=return_curves, **kwargs)
@@ -70,10 +73,14 @@ class _RepairMixin:
     def cleaned(self, tolerance=None, **kwargs):
         """Duplicate vertices and degenerate faces removed.
 
-        With ``return_index_map=True`` also returns the face and point
-        index maps, each a ``(f, kept_ids)`` pair, exactly as
+        ``tolerance`` merges vertices within that world-coordinate
+        distance (``None`` keeps exact-duplicate merging only). With
+        ``return_index_map=True`` also returns the face and point index
+        maps, each a ``(f, kept_ids)`` pair, exactly as
         :func:`trueform.cleaned` returns them for a mesh — passed through
-        untouched. See :func:`trueform.cleaned` for keyword arguments.
+        untouched. See :func:`trueform.cleaned` for the remaining keyword
+        arguments (``remove_duplicate_primitives``,
+        ``remove_unreferenced_points``).
         """
         result = tf.cleaned(self.to_mesh(), tolerance, **kwargs)
         if kwargs.get("return_index_map"):

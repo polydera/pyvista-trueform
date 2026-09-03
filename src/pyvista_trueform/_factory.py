@@ -205,13 +205,17 @@ def mesh_arrangements(datasets, **kwargs):
     ``trueform_face_labels``. With ``return_curves=True`` also returns the
     intersection curves as a second, line-only PolyData. Operands stay a
     triangle mesh when every one is all-triangle; otherwise every operand
-    is re-expressed as dynamic faces first, as in :func:`csg_graph`. See
-    :func:`trueform.mesh_arrangements` for keyword arguments.
+    is re-expressed as dynamic faces first, as in :func:`csg_graph`.
 
     Parameters
     ----------
     datasets : sequence of pyvista.PolyData or trueform.Mesh
         The operands, two or more.
+    **kwargs
+        Forwarded to :func:`trueform.mesh_arrangements` (``mode``,
+        ``tolerance``, ``resolve_crossings``, ``resolve_self_crossings``,
+        ``within``, ``triangulation``, in addition to ``return_curves``
+        above).
 
     Returns
     -------
@@ -245,9 +249,9 @@ def domains(datasets_or_graph, expr=None, **kwargs):
     expr : trueform.Expr or int, optional
         Restrict to domains inside the expression's selection.
     **kwargs
-        Forwarded to :meth:`trueform.CsgGraph.domains`
-        (``exclude_outer_shell``, ``ignore_open_fragments``,
-        ``selection``).
+        Forwarded to :meth:`CsgGraph.domains`
+        (``selection``, ``exclude_outer_shell``, ``ignore_open_fragments``,
+        ``return_source_ids``, ``return_index_map``).
 
     Returns
     -------
