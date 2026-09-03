@@ -1,17 +1,17 @@
 # pyvista-trueform
 
-[trueform](https://trueform.polydera.com) operations on
-[PyVista](https://pyvista.org) meshes: exact booleans, intersection curves,
-self-intersection repair, isocontours and isobands, N-ary CSG — through one
-`.trueform` accessor on `pyvista.PolyData`.
+Exact mesh booleans, intersection curves, self-intersection repair,
+isocontours and isobands, and N-ary CSG on [PyVista](https://pyvista.org)
+meshes. PyVista in, PyVista out, through one `.trueform` accessor on
+`pyvista.PolyData`.
 
-## Install
+## Installation
 
-```
+```bash
 pip install pyvista-trueform
 ```
 
-## Use
+## Quick Tour
 
 ```python
 import pyvista as pv
@@ -170,6 +170,6 @@ repaired faces array, no verdict yet.
 
 ## License
 
-Noncommercial use under the PolyForm Noncommercial License 1.0.0 (see
-`LICENSE.noncommercial`); commercial licensing via `info@polydera.com` (see
-`LICENSE`).
+Dual-licensed:
+- **Noncommercial**: [PolyForm Noncommercial License 1.0.0](./LICENSE.noncommercial)
+- **Commercial**: Contact [info@polydera.com](mailto:info@polydera.com)
