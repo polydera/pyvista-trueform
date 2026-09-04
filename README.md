@@ -1,6 +1,6 @@
-![pyvista-trueform](assets/header.png)
+![pyvista-trueform](https://raw.githubusercontent.com/polydera/pyvista-trueform/main/assets/header.png)
 
-![Six overlapping spheres split into their domains by one csg_graph arrangement](assets/hero_domains_multiblock.png)
+![Six overlapping spheres split into their domains by one csg_graph arrangement](https://raw.githubusercontent.com/polydera/pyvista-trueform/main/assets/hero_domains_multiblock.png)
 
 Exact mesh booleans, intersection curves, self-intersection repair,
 isocontours and isobands, and N-ary CSG on [PyVista](https://pyvista.org)
@@ -227,7 +227,7 @@ tfpv.sphere(1.0, dtype=np.float64, index_dtype=np.int64)  # trueform's defaults 
 
 ### Examples
 
-![A sphere fractured by a grid of cutters in one csg_graph expression, read back as exploded domain chunks](assets/hero_csg_fracture.png)
+![A sphere fractured by a grid of cutters in one csg_graph expression, read back as exploded domain chunks](https://raw.githubusercontent.com/polydera/pyvista-trueform/main/assets/hero_csg_fracture.png)
 
 Seven standalone scripts in `examples/`, each with an importable
 `compute()` and a plotting `main()` (`python examples/<name>.py`); the
