@@ -83,3 +83,31 @@ class _TopologyMixin:
             return pv.PolyData()
         return curves_to_pyvista(tf.connect_edges_to_paths(edges),
                                  self.to_mesh().points)
+
+    def boundary_edges(self):
+        """Every edge belonging to exactly one face, as a line-only PolyData.
+
+        One line cell per ``(N, 2)`` edge of
+        :func:`trueform.boundary_edges`, its two ids naming this dataset's
+        own points — the result carries the full point array, so cell ids
+        read straight back into the dataset. An empty PolyData when the
+        mesh is closed.
+        """
+        edges = tf.boundary_edges(self.to_mesh())
+        if len(edges) == 0:
+            return pv.PolyData()
+        return _edge_lines(edges, self.to_mesh().points)
+
+    def boundary_paths(self):
+        """The boundary edges assembled into loops, ids naming this
+        dataset's own points.
+
+        One line cell per loop of :func:`trueform.boundary_paths`, closed
+        by repeating its first id. An empty PolyData when the mesh is
+        closed. :meth:`boundary_curves` answers the same loops over a
+        compacted point set of its own instead.
+        """
+        paths = tf.boundary_paths(self.to_mesh())
+        if len(paths.data) == 0:
+            return pv.PolyData()
+        return curves_to_pyvista(paths, self.to_mesh().points)

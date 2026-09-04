@@ -738,6 +738,30 @@ def test_accessor_non_manifold_paths():
     assert pv.Sphere().trueform.non_manifold_paths().GetNumberOfLines() == 0
 
 
+def test_accessor_boundary_edges_and_paths():
+    points = np.array(
+        [[0, 0, 0], [1, 0, 0], [1, 1, 0], [0, 1, 0]], dtype=np.float32)
+    plane = _polydata(points, [[0, 1, 2], [0, 2, 3]])
+
+    edges = plane.trueform.boundary_edges()
+    assert edges.GetNumberOfLines() == 4  # the unit-square rim
+    pairs = vtk_to_numpy(
+        edges.GetLines().GetConnectivityArray()).reshape(-1, 2)
+    assert {frozenset(pair) for pair in pairs.tolist()} == {
+        frozenset({0, 1}), frozenset({1, 2}),
+        frozenset({2, 3}), frozenset({3, 0})}
+    np.testing.assert_array_equal(np.asarray(edges.points), points)
+
+    paths = plane.trueform.boundary_paths()
+    assert paths.GetNumberOfLines() == 1
+    loop = vtk_to_numpy(paths.GetLines().GetConnectivityArray())
+    assert loop[0] == loop[-1]  # one closed loop
+    assert sorted(loop[:-1]) == [0, 1, 2, 3]  # visiting all four vertices
+
+    assert pv.Sphere().trueform.boundary_edges().GetNumberOfLines() == 0
+    assert pv.Sphere().trueform.boundary_paths().GetNumberOfLines() == 0
+
+
 # -- io ------------------------------------------------------------------
 
 
