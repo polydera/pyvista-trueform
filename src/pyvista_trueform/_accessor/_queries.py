@@ -96,11 +96,16 @@ class _QueriesMixin:
     def distance(self, other):
         """Euclidean distance to ``other``.
 
-        ``other`` is a PolyData, a trueform Mesh, or a ``(3,)`` point.
-        See :func:`trueform.distance`.
+        ``other`` is a PolyData, a trueform Mesh, a trueform primitive
+        (:class:`trueform.Point`, ``Segment``, ``Line``, ``Ray``,
+        ``Plane``, ``Triangle``, ``AABB`` — a batched one answers a
+        ``(N,)`` array), or a ``(3,)`` point. See
+        :func:`trueform.distance`.
         """
         if isinstance(other, (tf.Mesh, pv.PolyData)):
             return tf.distance(self.to_mesh(), _operand_mesh(other))
+        if isinstance(other, tf.Primitive):
+            return tf.distance(self.to_mesh(), other)
         return tf.distance(self.to_mesh(),
                            tf.Point(self._query_point(other, "other")))
 
@@ -123,27 +128,38 @@ class _QueriesMixin:
             np.ascontiguousarray(points.astype(target.dtype, copy=False))))
 
     def intersects(self, other):
-        """True when this mesh intersects ``other`` (PolyData or trueform
-        Mesh). See :func:`trueform.intersects`.
+        """True when this mesh intersects ``other`` — a PolyData, a
+        trueform Mesh, or a trueform primitive (a batched one answers a
+        0/1 ``(N,)`` array). See :func:`trueform.intersects`.
         """
+        if isinstance(other, tf.Primitive):
+            return tf.intersects(self.to_mesh(), other)
         return tf.intersects(self.to_mesh(), _operand_mesh(other))
 
     def closest_point(self, query_point, *, radius=None):
         """The mesh point closest to ``query_point``.
 
+        ``query_point`` is a ``(3,)`` point or a trueform primitive.
         Returns ``(face_id, distance, point)`` — the nearest face, the
         euclidean distance, and the closest point on the mesh — or
         ``None`` when ``radius`` bounds the search and nothing lies
-        within it. The underlying :func:`trueform.neighbor_search` reports
-        the squared metric; this package says "distance" only for
-        euclidean. Its ``k`` is not reachable here: a batch of neighbors
-        does not fit this method's single-result return shape.
+        within it. A batched primitive answers arrays instead:
+        ``(face_ids, distances, points)`` of shapes ``(N,)``, ``(N,)``,
+        ``(N, 3)``, a miss marked ``-1`` in ``face_ids``. The underlying
+        :func:`trueform.neighbor_search` reports the squared metric; this
+        package says "distance" only for euclidean. ``k`` lives on
+        :meth:`closest_points`.
         """
-        result = tf.neighbor_search(
-            self.to_mesh(), self._query_point(query_point, "query_point"),
-            radius=radius)
+        if isinstance(query_point, tf.Primitive):
+            query = query_point
+        else:
+            query = tf.Point(self._query_point(query_point, "query_point"))
+        result = tf.neighbor_search(self.to_mesh(), query, radius=radius)
         if result is None:
             return None
+        if query.is_batch:
+            face_ids, distances2, points = result
+            return face_ids, np.sqrt(distances2), points
         face_id, distance2, point = result
         return face_id, math.sqrt(float(distance2)), point
 

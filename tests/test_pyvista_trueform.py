@@ -593,6 +593,43 @@ def test_accessor_distance_and_intersects():
     assert a.trueform.distance([2.5, 0.0, 0.0]) == 2.0
 
 
+def test_accessor_queries_speak_trueform_primitives():
+    sphere = tfpv.sphere(1.0)  # a vertex at (1, 0, 0) and at (0, 0, 1)
+    segment = tf.Segment(
+        np.array([[2.0, 0.0, 0.0], [3.0, 0.0, 0.0]], dtype=np.float32))
+
+    assert sphere.trueform.distance(segment) == 1.0
+    assert not sphere.trueform.intersects(segment)
+
+    face_id, distance, point = sphere.trueform.closest_point(segment)
+    assert face_id >= 0
+    assert distance == 1.0
+    np.testing.assert_allclose(point, [1.0, 0.0, 0.0], atol=1e-6)
+
+    hits = sphere.trueform.closest_points(segment, 3)
+    assert [hit_distance for _, hit_distance, _ in hits] == [1.0, 1.0, 1.0]
+
+    # the other primitive families dispatch the same way
+    aabb = tf.AABB(min=np.array([2, 2, 2], dtype=np.float32),
+                   max=np.array([3, 3, 3], dtype=np.float32))
+    assert not sphere.trueform.intersects(aabb)
+    plane = tf.Plane(normal=np.array([0, 0, 1.0], dtype=np.float32),
+                     offset=np.float32(-5.0))
+    assert sphere.trueform.distance(plane) == 4.0  # the (0, 0, 1) pole
+
+    # a batched primitive answers arrays
+    segments = tf.Segment(np.array(
+        [[[2.0, 0.0, 0.0], [3.0, 0.0, 0.0]],
+         [[0.0, 3.0, 0.0], [0.0, 4.0, 0.0]]], dtype=np.float32))
+    np.testing.assert_array_equal(
+        sphere.trueform.distance(segments), [1.0, 2.0])
+    np.testing.assert_array_equal(
+        sphere.trueform.intersects(segments), [0, 0])
+    face_ids, distances, points = sphere.trueform.closest_point(segments)
+    np.testing.assert_array_equal(distances, [1.0, 2.0])  # euclidean
+    assert face_ids.shape == (2,) and points.shape == (2, 3)
+
+
 def test_accessor_closest_point_on_corner():
     cube = _cube()
     face_id, distance, point = cube.trueform.closest_point([2.0, 2.0, 2.0])
