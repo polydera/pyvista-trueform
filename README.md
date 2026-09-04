@@ -234,7 +234,7 @@ gallery ships in the Polydera color scheme through the shared
 - `isobands.py` — height isobands and isocontours overlaid on a
   surface, recut live from a band-count slider.
 - `signed_distance.py` — a hills surface recolored live by signed
-  distance to a dragged probe sphere, diverging about the zero seam.
+  distance to a dragged torus probe, diverging about the zero seam.
 - `curvature.py` — Gaussian curvature across a torus and mean curvature
   across a hills surface, from one `principal_curvatures` call each.
 - `remesh_and_simplify.py` — remeshed, decimated, and simplified side by
