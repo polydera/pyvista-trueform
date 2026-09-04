@@ -490,6 +490,14 @@ def test_accessor_measurements_exact():
     assert cube.trueform.area() == 6.0
 
 
+def test_accessor_signed_volume_tells_orientation():
+    cube = _cube()
+    assert cube.trueform.signed_volume() == 1.0
+    flipped = _polydata(np.asarray(cube.points),
+                        [list(f[::-1]) for f in cube.regular_faces])
+    assert flipped.trueform.signed_volume() == -1.0
+
+
 def test_accessor_euler_characteristic():
     sphere = pv.Sphere()
     assert sphere.trueform.euler_characteristic() == 2
