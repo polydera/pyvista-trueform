@@ -294,4 +294,41 @@ def domains(datasets_or_graph, expr=None, *, selection=None,
                          return_index_map=return_index_map)
 
 
-__all__ = ["CsgGraph", "csg_graph", "domains", "mesh_arrangements"]
+def split_into_domains(arranged, *, ignore_open_fragments=None,
+                       exclude_outer_shell=None):
+    """Split an already-arranged mesh into its volumetric domains.
+
+    Reads a dataset whose faces already stop at every intersection — a
+    :func:`mesh_arrangements` output, a :meth:`CsgGraph.mesh` read — with
+    :func:`trueform.domain_labels` and splits it with
+    :func:`trueform.split_into_domains`: no arrangement is built, the
+    labeling walks the faces as they are. :meth:`TrueformAccessor.domains`
+    is the other entry: it arranges the dataset from scratch through its
+    own self :class:`trueform.CsgGraph`, so it is the one to call on a
+    mesh that still self-intersects. Block ``k`` is domain ``ids[k]``,
+    named ``str(ids[k])``, watertight with outward-of-domain normals.
+
+    Parameters
+    ----------
+    arranged : pyvista.PolyData or trueform.Mesh
+        The already-cut mesh; a PolyData converts through its own
+        accessor cache.
+    ignore_open_fragments, exclude_outer_shell
+        Forwarded to :func:`trueform.domain_labels`; trueform's defaults
+        apply when omitted — note that by default the unbounded universe
+        is a domain too, where the graph readers exclude it.
+
+    Returns
+    -------
+    pyvista.MultiBlock
+    """
+    mesh = _operand_mesh(arranged)
+    labels = tf.domain_labels(mesh, **_forwarded(
+        ignore_open_fragments=ignore_open_fragments,
+        exclude_outer_shell=exclude_outer_shell))
+    cells, ids = tf.split_into_domains(mesh, labels)
+    return domains_to_pyvista(cells, ids)
+
+
+__all__ = ["CsgGraph", "csg_graph", "domains", "mesh_arrangements",
+           "split_into_domains"]

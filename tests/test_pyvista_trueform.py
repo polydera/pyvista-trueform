@@ -997,6 +997,27 @@ def test_domains_of_two_cubes():
         graph.native.domains(tf.op(0) & tf.op(1))[1][0])
 
 
+def test_split_into_domains_of_arranged_mesh():
+    a = _cube()
+    b = _cube(center=(0.5, 0.5, 0.5))
+    arranged = tfpv.mesh_arrangements([a, b])  # already cut
+
+    blocks = tfpv.split_into_domains(arranged, exclude_outer_shell=True)
+    assert isinstance(blocks, pv.MultiBlock)
+    assert blocks.n_blocks == 3  # A-only, B-only, and the shared core
+    volumes = sorted(block.volume for block in blocks)
+    np.testing.assert_allclose(volumes, [0.125, 0.875, 0.875], rtol=1e-4)
+    for block in blocks:
+        assert block.trueform.is_closed()
+
+    # trueform's own default keeps the unbounded universe as a block too
+    with_universe = tfpv.split_into_domains(arranged)
+    assert with_universe.n_blocks == 4
+    volumes = sorted(abs(block.volume) for block in with_universe)
+    np.testing.assert_allclose(
+        volumes, [0.125, 0.875, 0.875, 1.875], rtol=1e-4)
+
+
 def test_domains_block_names_are_domain_ids():
     a = _cube()
     b = _cube(center=(0.5, 0.5, 0.5))

@@ -19,7 +19,8 @@ except Exception:
 from ._accessor import TrueformAccessor
 from ._conversion import (curves_to_pyvista, domains_to_pyvista,
                           to_pyvista, to_trueform)
-from ._factory import CsgGraph, csg_graph, domains, mesh_arrangements
+from ._factory import (CsgGraph, csg_graph, domains, mesh_arrangements,
+                       split_into_domains)
 from ._generators import box, cylinder, plane, sphere
 from ._io import read, write
 from ._pick import ClosestHit, RayHit, closest, pick
@@ -51,6 +52,7 @@ __all__ = [
     "plane",
     "read",
     "sphere",
+    "split_into_domains",
     "to_pyvista",
     "to_trueform",
     "tube",
