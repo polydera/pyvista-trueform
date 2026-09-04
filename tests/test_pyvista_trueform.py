@@ -1425,6 +1425,35 @@ def test_generators_forward_dtype():
     assert mesh.regular_faces.dtype == np.int64
 
 
+# -- colormaps -----------------------------------------------------------
+
+
+def test_polydera_colormaps_registered():
+    import matplotlib
+
+    assert "polydera" in matplotlib.colormaps
+    assert "polydera_div" in matplotlib.colormaps
+    import pyvista_trueform._colormaps as colormaps
+    importlib.reload(colormaps)  # re-registration is a no-op, not an error
+
+
+def test_polydera_colormap_values():
+    from matplotlib.colors import Colormap, to_hex
+
+    seq = tfpv.polydera_seq()
+    div = tfpv.polydera_div()
+    assert isinstance(seq, Colormap) and isinstance(div, Colormap)
+    assert to_hex(seq(0.0)) == "#001a17"
+    assert to_hex(seq(1.0)) == "#ff6b2c"
+    assert to_hex(div(0.0)) == "#ff6b2c"
+    assert to_hex(div(1.0)) == "#00d5be"
+    assert np.allclose(div(0.5)[:3], np.full(3, 0x60 / 255), atol=0.02)
+    assert np.allclose(seq(0.5)[:3],
+                       np.array([0x00, 0xd5, 0xbe]) / 255, atol=0.02)
+    assert tfpv.polydera_cmap([-1.0, 2.0]).name == "polydera_div"
+    assert tfpv.polydera_cmap([0.5, 2.0]).name == "polydera"
+
+
 # -- examples ------------------------------------------------------------
 
 

@@ -4,8 +4,8 @@ The Polydera color scheme and presentation theme for the example gallery
 One dark ground, one teal, and six categorical accents, shared by every
 example's plotting path. The theme is handed to each Plotter explicitly —
 never installed globally — so importing an example colors nothing. The
-sequential and diverging colormaps are the Polydera maps defined in
-lunar's src/viewport/colorMaps.ts; the waypoints here mirror that file.
+sequential and diverging colormaps come from pyvista_trueform itself —
+the package is the one producer of the Polydera maps.
 
 Copyright (c) 2025 Žiga Sajovic, XLAB
 Licensed for noncommercial use under the PolyForm Noncommercial License 1.0.0.
@@ -14,6 +14,9 @@ https://github.com/polydera/pyvista-trueform
 """
 
 import pyvista as pv
+
+from pyvista_trueform import (polydera_cmap, polydera_div,  # noqa: F401
+                              polydera_seq)
 
 BACKGROUND = "#0c1513"
 TEAL = "#00d5be"
@@ -25,9 +28,6 @@ BLUE = "#5985c4"
 LIGHT = "#e8f2ef"
 EDGE = "#1e4038"
 ACCENTS = (TEAL, ROSE, AMBER, CORAL, PURPLE, BLUE)
-
-SEQ_WAYPOINTS = ("#001a17", "#006d63", "#00d5be", "#ffbb7a", "#ff6b2c")
-DIV_WAYPOINTS = ("#ff6b2c", "#a0401a", "#606060", "#1a5a52", "#00d5be")
 
 
 def theme():
@@ -59,24 +59,6 @@ def label_cmap(n):
     return ListedColormap([ACCENTS[k % len(ACCENTS)] for k in range(n)])
 
 
-def _waypoint_cmap(name, waypoints):
-    from matplotlib.colors import LinearSegmentedColormap
-
-    cmap = LinearSegmentedColormap.from_list(name, waypoints)
-    cmap.set_bad(BACKGROUND)
-    return cmap
-
-
-def polydera_seq():
-    """The Polydera sequential map: dark teal ground to brand teal to warm."""
-    return _waypoint_cmap("polydera_seq", SEQ_WAYPOINTS)
-
-
-def polydera_div():
-    """The Polydera diverging map: orange through mid gray (zero) to teal."""
-    return _waypoint_cmap("polydera_div", DIV_WAYPOINTS)
-
-
 def polydera_bands(n, floor=0.15):
     """``n`` sequential band colors, starting visibly above the page ground.
 
@@ -88,13 +70,3 @@ def polydera_bands(n, floor=0.15):
     from matplotlib.colors import ListedColormap
 
     return ListedColormap(polydera_seq()(np.linspace(floor, 1.0, n)))
-
-
-def polydera_cmap(values):
-    """Diverging when ``values`` cross zero, sequential otherwise."""
-    import numpy as np
-
-    values = np.asarray(values)
-    if np.nanmin(values) < 0.0 < np.nanmax(values):
-        return polydera_div()
-    return polydera_seq()

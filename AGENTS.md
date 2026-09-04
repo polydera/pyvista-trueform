@@ -78,9 +78,10 @@ Developed jointly by Žiga Sajovic and Claude.
 - Commits: house conventional style (`feat(scope): lowercase declarative`),
   one concern per commit, tests land with the feature they fixture, NO
   trailers of any kind.
-- The Polydera colormaps in `examples/_theme.py` are a copy of
-  /Users/ziga/polydera/lunar/src/viewport/colorMaps.ts — that file is the
-  definition's home; never let the two drift silently.
+- The Polydera colormaps in `src/pyvista_trueform/_colormaps.py` are a copy
+  of /Users/ziga/polydera/lunar/src/viewport/colorMaps.ts — that file is the
+  definition's home; never let the two drift silently. The package is their
+  one producer; `examples/_theme.py` imports them.
 ## Validation
 
 ```bash

@@ -17,6 +17,7 @@ except Exception:
     __version__ = "0.0.0"
 
 from ._accessor import TrueformAccessor
+from ._colormaps import polydera_cmap, polydera_div, polydera_seq
 from ._conversion import (curves_to_pyvista, domains_to_pyvista,
                           to_pyvista, to_trueform)
 from ._factory import (CsgGraph, csg_graph, domains, mesh_arrangements,
@@ -52,6 +53,9 @@ __all__ = [
     "mesh_arrangements",
     "pick",
     "plane",
+    "polydera_cmap",
+    "polydera_div",
+    "polydera_seq",
     "read",
     "sphere",
     "split_into_domains",

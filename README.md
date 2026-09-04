@@ -158,6 +158,7 @@ a.trueform.is_closed()               # .is_open(), .is_manifold(), .is_non_manif
                                      # .euler_characteristic() too
 a.trueform.distance(b)               # euclidean; .intersects(b) too
 a.trueform.signed_distance(b)        # negative inside b; batched over a's own points
+a.plot(scalars=a.trueform.signed_distance(b), cmap="polydera_div")  # packaged map, registered on import
 a.trueform.closest_point([0, 0, 0])  # (face_id, distance, point)
 a.trueform.closest_points([2, 0, 0], k=3)  # the k nearest, closest first
 a.trueform.closest_point_pair(b)     # witness pair between a and b
