@@ -42,9 +42,11 @@ def align_rigid(source, target):
 
     ``source`` and ``target`` are any PyVista datasets with ``.points``,
     bare ``(N, 3)`` arrays, or :class:`trueform.PointCloud` objects, in
-    point-to-point correspondence (Kabsch). The result is a homogeneous
-    ``(4, 4)`` matrix mapping source world coordinates to target world
-    coordinates — ready for ``dataset.transform(matrix)``.
+    point-to-point correspondence (Kabsch). The result is the delta: a
+    homogeneous ``(4, 4)`` matrix mapping ``source``'s current points
+    onto ``target``, nothing of the source's own history composed in —
+    apply it to the source itself to align,
+    ``source.transform(matrix, inplace=False)``.
 
     No options: rigid alignment has none beyond the two clouds.
 
@@ -69,10 +71,11 @@ def align_similarity(source, target):
     ``source`` and ``target`` are any PyVista datasets with ``.points``,
     bare ``(N, 3)`` arrays, or :class:`trueform.PointCloud` objects, in
     point-to-point correspondence, the same requirement as
-    :func:`align_rigid`. The result is a homogeneous ``(4, 4)`` matrix
-    mapping source world coordinates to target world coordinates, its
-    linear part carrying the uniform scale — ready for
-    ``dataset.transform(matrix)``.
+    :func:`align_rigid`. The result is the delta: a homogeneous
+    ``(4, 4)`` matrix mapping ``source``'s current points onto
+    ``target``, its linear part carrying the uniform scale, nothing of
+    the source's own history composed in — apply it to the source
+    itself to align, ``source.transform(matrix, inplace=False)``.
 
     No options: similarity alignment has none beyond the two clouds.
 
@@ -93,9 +96,11 @@ def align_icp(source, target, *, max_iterations=None, n_samples=None,
 
     ``source`` and ``target`` are any PyVista datasets with ``.points``,
     bare ``(N, 3)`` arrays, or :class:`trueform.PointCloud` objects; no
-    correspondence is required. The result is a homogeneous ``(4, 4)``
-    matrix mapping source world coordinates to target world coordinates —
-    ready for ``dataset.transform(matrix)``.
+    correspondence is required. The result is the delta: a homogeneous
+    ``(4, 4)`` matrix mapping ``source``'s current points onto
+    ``target``, nothing of the source's own history composed in — apply
+    it to the source itself to align,
+    ``source.transform(matrix, inplace=False)``.
 
     Options (trueform's defaults apply when omitted):
 
@@ -130,9 +135,11 @@ def align_obb(source, target, *, sample_size=None):
 
     ``source`` and ``target`` are any PyVista datasets with ``.points``,
     bare ``(N, 3)`` arrays, or :class:`trueform.PointCloud` objects; no
-    correspondence is used. The result is a homogeneous ``(4, 4)`` matrix
-    mapping source world coordinates to target world coordinates — ready
-    for ``dataset.transform(matrix)``.
+    correspondence is used. The result is the delta: a homogeneous
+    ``(4, 4)`` matrix mapping ``source``'s current points onto
+    ``target``, nothing of the source's own history composed in — apply
+    it to the source itself to align,
+    ``source.transform(matrix, inplace=False)``.
 
     Options (trueform's default applies when omitted):
 
@@ -156,9 +163,11 @@ def align_knn(source, target, *, k=None, sigma=None, outlier_proportion=None):
 
     ``source`` and ``target`` are any PyVista datasets with ``.points``,
     bare ``(N, 3)`` arrays, or :class:`trueform.PointCloud` objects; no
-    correspondence is required. The result is a homogeneous ``(4, 4)``
-    matrix mapping source world coordinates to target world coordinates —
-    ready for ``dataset.transform(matrix)``.
+    correspondence is required. The result is the delta: a homogeneous
+    ``(4, 4)`` matrix mapping ``source``'s current points onto
+    ``target``, nothing of the source's own history composed in — apply
+    it to the source itself to align,
+    ``source.transform(matrix, inplace=False)``.
 
     Options (trueform's defaults apply when omitted):
 

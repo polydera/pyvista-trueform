@@ -177,10 +177,10 @@ align_icp(a, b)         # iterative closest point, no correspondence needed
 align_obb(a, b)         # oriented-bounding-box alignment, no correspondence
 align_knn(a, b)         # one soft-correspondence step
 chamfer_distance(a, b)  # one-way chamfer measure
-```
 
-Each `align_*` returns a 4x4 world-to-world matrix ready for
-`dataset.transform`.
+matrix = align_rigid(a, b)                    # 4x4 delta: maps a's current points onto b
+aligned = a.transform(matrix, inplace=False)  # apply to a itself to align it with b
+```
 
 ### Tubes
 
