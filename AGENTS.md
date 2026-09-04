@@ -59,6 +59,11 @@ Developed jointly by Žiga Sajovic and Claude.
   through `pyvista.register_dataset_accessor` and the `pyvista.accessors`
   entry point — both, so `import pyvista_trueform` and a bare
   `import pyvista` reach the same accessor.
+- What PyVista already does well stays PyVista's: plain normals
+  (`compute_normals`), smoothing (`smooth`, `smooth_taubin`), and IO
+  passthroughs beyond `read`/`write` are its idioms, and this package
+  does not shadow them — a binding earns its place only where trueform
+  produces the fact.
 
 ## Working here
 
