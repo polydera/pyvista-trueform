@@ -70,6 +70,36 @@ def _cell_array(offsets, connectivity):
     return cells
 
 
+def _line_paths(dataset):
+    """Detached trueform paths of a line-only PolyData: unordered 2-point
+    segments connect into polylines through
+    :func:`trueform.connect_edges_to_paths`; polyline cells pass through
+    (copied, so the paths never alias the dataset's VTK arrays).
+    """
+    if not isinstance(dataset, pv.PolyData):
+        raise TypeError(
+            f"lines must be a pyvista.PolyData, got {type(dataset).__name__}")
+    families = {
+        "vertices": dataset.GetNumberOfVerts(),
+        "polygons": dataset.GetNumberOfPolys(),
+        "strips": dataset.GetNumberOfStrips(),
+    }
+    present = [name for name, count in families.items() if count]
+    if present:
+        raise ValueError(
+            "PolyData must contain lines only; found " + ", ".join(present))
+    if not dataset.GetNumberOfLines():
+        raise ValueError("PolyData contains no lines")
+    cells = dataset.GetLines()
+    offsets = vtk_to_numpy(cells.GetOffsetsArray())
+    connectivity = vtk_to_numpy(cells.GetConnectivityArray())
+    if np.all(np.diff(offsets) == 2):
+        return tf.connect_edges_to_paths(
+            np.ascontiguousarray(connectivity.reshape(-1, 2)))
+    return tf.OffsetBlockedArray(np.array(offsets, copy=True, order="C"),
+                                 np.array(connectivity, copy=True, order="C"))
+
+
 def to_trueform(dataset):
     """Copy polygonal PyVista geometry into a fresh trueform Mesh.
 

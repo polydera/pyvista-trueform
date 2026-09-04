@@ -8,38 +8,10 @@ https://github.com/polydera/pyvista-trueform
 """
 
 import numpy as np
-import pyvista as pv
 import trueform as tf
-from vtkmodules.util.numpy_support import vtk_to_numpy
 
-from ._conversion import _validated_points, to_pyvista
+from ._conversion import _line_paths, _validated_points, to_pyvista
 from ._forward import _forwarded
-
-
-def _line_paths(dataset):
-    if not isinstance(dataset, pv.PolyData):
-        raise TypeError(
-            f"lines must be a pyvista.PolyData, got {type(dataset).__name__}")
-    families = {
-        "vertices": dataset.GetNumberOfVerts(),
-        "polygons": dataset.GetNumberOfPolys(),
-        "strips": dataset.GetNumberOfStrips(),
-    }
-    present = [name for name, count in families.items() if count]
-    if present:
-        raise ValueError(
-            "PolyData must contain lines only; found " + ", ".join(present))
-    if not dataset.GetNumberOfLines():
-        raise ValueError("PolyData contains no lines")
-    cells = dataset.GetLines()
-    offsets = vtk_to_numpy(cells.GetOffsetsArray())
-    connectivity = vtk_to_numpy(cells.GetConnectivityArray())
-    if np.all(np.diff(offsets) == 2):
-        # Unordered 2-point segments: connect them into polylines first.
-        return tf.connect_edges_to_paths(
-            np.ascontiguousarray(connectivity.reshape(-1, 2)))
-    return tf.OffsetBlockedArray(np.ascontiguousarray(offsets),
-                                 np.ascontiguousarray(connectivity))
 
 
 def tube(lines, radius, *, n_segments=None):

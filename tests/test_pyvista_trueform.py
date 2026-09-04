@@ -1285,6 +1285,39 @@ def test_tube_refuses_non_line_input():
         tfpv.tube(object(), radius=0.1)
 
 
+def test_connect_lines_assembles_segments():
+    points = np.array(
+        [[0, 0, 0], [1, 0, 0], [1, 1, 0], [0, 1, 0]], dtype=np.float32)
+    soup = _segment_soup_polydata(points, [[0, 1], [2, 3], [1, 2], [3, 0]])
+
+    connected = tfpv.connect_lines(soup)
+    assert connected.GetNumberOfLines() == 1
+    path = vtk_to_numpy(connected.GetLines().GetConnectivityArray())
+    assert path[0] == path[-1]  # the square closes into one loop
+    assert sorted(path[:-1]) == [0, 1, 2, 3]  # visiting all four points
+    np.testing.assert_array_equal(np.asarray(connected.points), points)
+
+
+def test_connect_lines_passes_polylines_through_detached():
+    points = np.array(
+        [[0, 0, 0], [1, 0, 0], [2, 0, 0]], dtype=np.float32)
+    polyline = pv.PolyData()
+    polyline.SetPoints(pv.vtk_points(points, deep=True))
+    polyline.lines = np.array([3, 0, 1, 2])
+
+    connected = tfpv.connect_lines(polyline)
+    assert connected.GetNumberOfLines() == 1
+    np.testing.assert_array_equal(
+        vtk_to_numpy(connected.GetLines().GetConnectivityArray()), [0, 1, 2])
+
+    # detached: later edits of the input do not reach the result
+    polyline.points[0] = [9.0, 9.0, 9.0]
+    np.testing.assert_array_equal(np.asarray(connected.points), points)
+
+    with pytest.raises(ValueError, match="lines only"):
+        tfpv.connect_lines(_cube())
+
+
 # -- generators ------------------------------------------------------------
 
 

@@ -23,6 +23,7 @@ from ._factory import (CsgGraph, csg_graph, domains, mesh_arrangements,
                        split_into_domains)
 from ._generators import box, cylinder, plane, sphere
 from ._io import read, write
+from ._lines import connect_lines
 from ._pick import ClosestHit, RayHit, closest, pick
 from ._registration import (align_icp, align_knn, align_obb, align_rigid,
                             align_similarity, chamfer_distance)
@@ -42,6 +43,7 @@ __all__ = [
     "box",
     "chamfer_distance",
     "closest",
+    "connect_lines",
     "csg_graph",
     "curves_to_pyvista",
     "cylinder",
