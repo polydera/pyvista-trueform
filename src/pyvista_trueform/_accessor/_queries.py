@@ -49,6 +49,13 @@ class _QueriesMixin:
         """
         return tf.signed_volume(self.to_mesh())
 
+    def mean_edge_length(self):
+        """Mean edge length over every face's own edges, as a float — a
+        shared edge counts once per face holding it. See
+        :func:`trueform.mean_edge_length`.
+        """
+        return tf.mean_edge_length(self.to_mesh())
+
     def euler_characteristic(self):
         """Euler characteristic ``V - E + F``, each undirected edge counted
         once (boundary and non-manifold edges count like interior ones).

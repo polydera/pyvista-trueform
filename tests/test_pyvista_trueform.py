@@ -498,6 +498,15 @@ def test_accessor_signed_volume_tells_orientation():
     assert flipped.trueform.signed_volume() == -1.0
 
 
+def test_accessor_mean_edge_length():
+    points = np.array(
+        [[0, 0, 0], [1, 0, 0], [1, 1, 0], [0, 1, 0]], dtype=np.float32)
+    plane = _polydata(points, [[0, 1, 2], [0, 2, 3]])
+    # each face's own three edges, so the shared diagonal counts twice
+    assert plane.trueform.mean_edge_length() == pytest.approx(
+        (4.0 + 2.0 * math.sqrt(2.0)) / 6.0)
+
+
 def test_accessor_euler_characteristic():
     sphere = pv.Sphere()
     assert sphere.trueform.euler_characteristic() == 2
