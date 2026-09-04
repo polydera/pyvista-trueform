@@ -110,11 +110,15 @@ read("cube.stl")                              # STL welds duplicate vertices on 
 ### Domains and N-ary arrangements
 
 ```python
-from pyvista_trueform import domains, mesh_arrangements
+from pyvista_trueform import domains, mesh_arrangements, split_into_domains
 
 domains([a, b, c])            # every watertight domain, named by id, as a MultiBlock
 mesh_arrangements([a, b, c])  # the whole arrangement instead, as one labeled PolyData
 a.trueform.domains()          # one mesh's own overlap pockets, from its self arrangement
+
+arranged = mesh_arrangements([a, b, c])
+split_into_domains(arranged, exclude_outer_shell=True)  # already cut: labeled and
+                                                        # split, no second arrangement
 ```
 
 ### Picking
@@ -149,13 +153,24 @@ remeshed.cell_data["trueform_labels"]  # preserve_regions rides back as cell dat
 ### Queries
 
 ```python
-a.trueform.volume()                  # .area(), .euler_characteristic() too
+a.trueform.volume()                  # .area(), .signed_volume(), .mean_edge_length() too
+a.trueform.is_closed()               # .is_open(), .is_manifold(), .is_non_manifold(),
+                                     # .euler_characteristic() too
 a.trueform.distance(b)               # euclidean; .intersects(b) too
 a.trueform.signed_distance(b)        # negative inside b; batched over a's own points
 a.trueform.closest_point([0, 0, 0])  # (face_id, distance, point)
+a.trueform.closest_points([2, 0, 0], k=3)  # the k nearest, closest first
 a.trueform.closest_point_pair(b)     # witness pair between a and b
 a.trueform.principal_curvatures()    # (k0, k1); .shape_index() too
+
+seg = tf.Segment(np.array([[2, 0, 0], [3, 0, 0]], dtype=np.float32))
+a.trueform.distance(seg)             # queries take trueform primitives; .closest_point(seg) too
+
+n, labels = a.trueform.connected_components()  # (n, per-face component labels)
+a.trueform.split_components()        # one block per component, as a MultiBlock
 a.trueform.boundary_curves()         # open edges, as line PolyData
+a.trueform.boundary_edges()          # the dataset's own point ids instead; .boundary_paths(),
+                                     # .non_manifold_edges(), .non_manifold_paths() too
 
 ray = tf.Ray(origin=np.array([-2, 0, 0], dtype=np.float32),
             direction=np.array([1, 0, 0], dtype=np.float32))
@@ -182,13 +197,14 @@ matrix = align_rigid(a, b)                    # 4x4 delta: maps a's current poin
 aligned = a.transform(matrix, inplace=False)  # apply to a itself to align it with b
 ```
 
-### Tubes
+### Lines and tubes
 
 ```python
-from pyvista_trueform import tube
+from pyvista_trueform import connect_lines, tube
 
 line = pv.Line((0, 0, 0), (1, 0, 0))
 tube(line, radius=0.1)  # triangle tube; unordered 2-point segments connect first
+connect_lines(line)     # just the assembly: segments in, polylines out, same point ids
 ```
 
 ### Generators
