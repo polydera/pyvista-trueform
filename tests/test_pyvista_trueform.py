@@ -1497,9 +1497,6 @@ def test_examples_compute():
     assert (0.5 * decimated.n_cells <= simplified.n_cells
             <= 2 * decimated.n_cells)
 
-    _, _, _, before, after = _example("alignment").compute()
-    assert after < 1e-3 < before
-
     depth = _example("raycast_depth").compute(resolution=64)
     assert depth.shape == (64, 64)
     assert (~np.isnan(depth)).sum() > 0

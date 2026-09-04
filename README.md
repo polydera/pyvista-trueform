@@ -222,7 +222,7 @@ tfpv.sphere(1.0, dtype=np.float64, index_dtype=np.int64)  # trueform's defaults 
 
 ![A sphere fractured by a grid of cutters in one csg_graph expression, read back as exploded domain chunks](assets/hero_csg_fracture.png)
 
-Eight standalone scripts in `examples/`, each with an importable
+Seven standalone scripts in `examples/`, each with an importable
 `compute()` and a plotting `main()` (`python examples/<name>.py`); the
 gallery ships in the Polydera color scheme through the shared
 `examples/_theme.py`:
@@ -240,8 +240,6 @@ gallery ships in the Polydera color scheme through the shared
   across a hills surface, from one `principal_curvatures` call each.
 - `remesh_and_simplify.py` — remeshed, decimated, and simplified side by
   side.
-- `alignment.py` — a transformed copy registered back with `align_rigid`,
-  chamfer distance before and after.
 - `raycast_depth.py` — an orthographic depth image from one batched
   `tf.Ray` cast.
 
