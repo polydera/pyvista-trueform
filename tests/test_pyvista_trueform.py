@@ -442,6 +442,22 @@ def test_accessor_diagnostics():
     assert plane.trueform.is_manifold()
 
 
+def test_accessor_open_and_non_manifold_verdicts():
+    plane = pv.Plane(i_resolution=3, j_resolution=3)
+    assert plane.trueform.is_open() is True
+    assert plane.trueform.is_non_manifold() is False
+
+    sphere = pv.Sphere()
+    assert sphere.trueform.is_open() is False
+    assert sphere.trueform.is_non_manifold() is False
+
+    points = np.array(
+        [[0, 0, 0], [1, 0, 0], [0.5, 1, 0], [0.5, -1, 0], [0.5, 0, 1]],
+        dtype=np.float32)
+    fins = _polydata(points, [[0, 1, 2], [0, 1, 3], [0, 1, 4]])
+    assert fins.trueform.is_non_manifold() is True
+
+
 # -- remesh --------------------------------------------------------------
 
 

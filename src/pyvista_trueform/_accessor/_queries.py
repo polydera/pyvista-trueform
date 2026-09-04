@@ -30,9 +30,21 @@ class _QueriesMixin:
         """True when every edge is shared by exactly two faces (watertight)."""
         return tf.is_closed(self.to_mesh())
 
+    def is_open(self):
+        """True when at least one edge belongs to only one face.
+        See :func:`trueform.is_open`.
+        """
+        return tf.is_open(self.to_mesh())
+
     def is_manifold(self):
         """True when no edge is shared by more than two faces."""
         return tf.is_manifold(self.to_mesh())
+
+    def is_non_manifold(self):
+        """True when some edge is shared by more than two faces.
+        See :func:`trueform.is_non_manifold`.
+        """
+        return tf.is_non_manifold(self.to_mesh())
 
     def area(self):
         """Total surface area. See :func:`trueform.area`."""
