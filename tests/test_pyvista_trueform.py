@@ -1475,6 +1475,10 @@ def test_examples_compute():
     assert depth.shape == (64, 64)
     assert (~np.isnan(depth)).sum() > 0
 
+    hills, field = _example("signed_distance").compute()
+    assert field.shape == (hills.n_points,)
+    assert (field < 0).any() and (field > 0).any()
+
 
 # -- packaging -----------------------------------------------------------
 

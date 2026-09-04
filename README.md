@@ -221,7 +221,7 @@ tfpv.sphere(1.0, dtype=np.float64, index_dtype=np.int64)  # trueform's defaults 
 
 ![A sphere fractured by a grid of cutters in one csg_graph expression, read back as exploded domain chunks](assets/hero_csg_fracture.png)
 
-Seven standalone scripts in `examples/`, each with an importable
+Eight standalone scripts in `examples/`, each with an importable
 `compute()` and a plotting `main()` (`python examples/<name>.py`); the
 gallery ships in the Polydera color scheme through the shared
 `examples/_theme.py`:
@@ -233,6 +233,8 @@ gallery ships in the Polydera color scheme through the shared
   names it through `closest`.
 - `isobands.py` — height isobands and isocontours overlaid on a
   surface, recut live from a band-count slider.
+- `signed_distance.py` — a hills surface recolored live by signed
+  distance to a dragged probe sphere, diverging about the zero seam.
 - `curvature.py` — Gaussian curvature across a torus and mean curvature
   across a hills surface, from one `principal_curvatures` call each.
 - `remesh_and_simplify.py` — remeshed, decimated, and simplified side by
