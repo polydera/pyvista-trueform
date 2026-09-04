@@ -60,6 +60,13 @@ hit = tfpv.pick(blocks, ray)
 hit.block_index                      # which block the ray struck
 ```
 
+**The contract** the package holds itself to — dialect laws, the full
+surface, the gotchas — is one call away:
+
+```python
+print(tfpv.agents())  # the package contract, for agents and humans alike
+```
+
 The sections below cover the rest of the surface these three lean on.
 
 ### N-ary CSG

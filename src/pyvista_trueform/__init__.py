@@ -17,6 +17,7 @@ except Exception:
     __version__ = "0.0.0"
 
 from ._accessor import TrueformAccessor
+from ._agents import agents
 from ._colormaps import polydera_cmap, polydera_div, polydera_seq
 from ._conversion import (curves_to_pyvista, domains_to_pyvista,
                           to_pyvista, to_trueform)
@@ -36,6 +37,7 @@ __all__ = [
     "CsgGraph",
     "RayHit",
     "TrueformAccessor",
+    "agents",
     "align_icp",
     "align_knn",
     "align_obb",

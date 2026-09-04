@@ -40,3 +40,6 @@ Issues = "https://github.com/polydera/pyvista-trueform/issues"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+pyvista_trueform = ["_agents.md"]

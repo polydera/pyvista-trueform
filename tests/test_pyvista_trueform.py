@@ -8,6 +8,7 @@ https://github.com/polydera/pyvista-trueform
 """
 
 import gc
+import importlib.resources
 import importlib.util
 import math
 import subprocess
@@ -1516,3 +1517,29 @@ def test_entry_point_registers_accessor_without_import():
         "assert sphere.trueform.is_closed()\n"
     )
     subprocess.run([sys.executable, "-c", code], check=True)
+
+
+def test_agents_serves_the_shipped_contract():
+    text = tfpv.agents()
+    assert isinstance(text, str)
+    assert len(text) > 4000
+    assert text.lstrip().startswith("# pyvista-trueform caller contract")
+    resource = importlib.resources.files("pyvista_trueform") / "_agents.md"
+    assert resource.is_file()
+    assert text == resource.read_text(encoding="utf-8")
+
+
+def test_agents_names_every_public_export():
+    """The drift guard: a name added to the surface without joining the
+    contract document fails here, loudly."""
+    text = tfpv.agents()
+    exports = [name for name in tfpv.__all__ if not name.startswith("_")]
+    accessor_methods = [name for name in dir(tfpv.TrueformAccessor)
+                        if not name.startswith("_")]
+    graph_methods = [name for name in dir(tfpv.CsgGraph)
+                     if not name.startswith("_")]
+    assert exports and accessor_methods and graph_methods
+    missing = [name
+               for name in (*exports, *accessor_methods, *graph_methods)
+               if name not in text]
+    assert missing == []
