@@ -652,6 +652,35 @@ def test_accessor_closest_point_pair_radius():
     assert distance2 == 2.0
 
 
+def test_accessor_closest_points_knn():
+    sphere = tfpv.sphere(1.0)  # a vertex at (1, 0, 0) and at (0, 1, 0)
+
+    hits = sphere.trueform.closest_points([2.0, 0.0, 0.0], 3)
+    assert len(hits) == 3
+    for face_id, distance, point in hits:
+        assert distance == 1.0
+        np.testing.assert_allclose(point, [1.0, 0.0, 0.0], atol=1e-6)
+        assert face_id >= 0
+
+    # euclidean, proven where it differs from the squared metric
+    hits = sphere.trueform.closest_points([0.0, 3.0, 0.0], 3)
+    assert [distance for _, distance, _ in hits] == [2.0, 2.0, 2.0]
+
+    # radius bounds the search
+    assert sphere.trueform.closest_points([2.0, 0.0, 0.0], 3,
+                                          radius=0.5) == []
+
+    # a batched primitive answers arrays, counts telling the filled slots
+    batch = tf.Point(np.array([[2.0, 0.0, 0.0], [0.0, 3.0, 0.0]],
+                              dtype=np.float32))
+    face_ids, distances, points, counts = \
+        sphere.trueform.closest_points(batch, 3)
+    assert face_ids.shape == (2, 3)
+    np.testing.assert_array_equal(distances, [[1.0] * 3, [2.0] * 3])
+    assert points.shape == (2, 3, 3)
+    np.testing.assert_array_equal(counts, [3, 3])
+
+
 def test_accessor_closest_point_pair_refuses_pointless_operand():
     with pytest.raises(TypeError, match="operand must be"):
         _cube().trueform.closest_point_pair(pv.MultiBlock())

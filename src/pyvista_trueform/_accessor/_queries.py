@@ -135,6 +135,32 @@ class _QueriesMixin:
         face_id, distance2, point = result
         return face_id, math.sqrt(float(distance2)), point
 
+    def closest_points(self, query, k, *, radius=None):
+        """The ``k`` nearest mesh hits of ``query``.
+
+        ``query`` is a ``(3,)`` point or a single trueform primitive
+        (:class:`trueform.Point`, ``Segment``, ``Triangle``, ``Ray``,
+        ...); the answer is a list of up to ``k``
+        ``(face_id, distance, point)`` tuples, closest first —
+        :meth:`closest_point`'s vocabulary, batched over the neighbors.
+        ``radius`` bounds the search, so fewer than ``k`` (or none) may
+        answer. A batched primitive answers arrays instead:
+        ``(face_ids, distances, points, counts)`` of shapes ``(N, k)``,
+        ``(N, k)``, ``(N, k, 3)``, ``(N,)``, with ``-1`` in unfilled id
+        slots and ``counts[i]`` the filled ones of query ``i``. The
+        underlying :func:`trueform.neighbor_search` reports the squared
+        metric; every distance here is euclidean.
+        """
+        if not isinstance(query, tf.Primitive):
+            query = tf.Point(self._query_point(query, "query"))
+        result = tf.neighbor_search(self.to_mesh(), query, radius=radius,
+                                    k=k)
+        if query.is_batch:
+            face_ids, distances2, points, counts = result
+            return face_ids, np.sqrt(distances2), points, counts
+        return [(face_id, math.sqrt(float(distance2)), point)
+                for face_id, distance2, point in result]
+
     def closest_point_pair(self, other, *, radius=None):
         """The closest witness pair between this mesh and ``other``.
 
