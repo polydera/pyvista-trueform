@@ -705,6 +705,39 @@ def test_accessor_split_components():
         assert block.trueform.is_closed()
 
 
+def test_accessor_non_manifold_edges():
+    points = np.array(
+        [[0, 0, 0], [1, 0, 0], [0.5, 1, 0], [0.5, -1, 0], [0.5, 0, 1]],
+        dtype=np.float32)
+    fins = _polydata(points, [[0, 1, 2], [0, 1, 3], [0, 1, 4]])
+    lines = fins.trueform.non_manifold_edges()
+    assert isinstance(lines, pv.PolyData)
+    assert lines.GetNumberOfLines() == 1
+    edge = vtk_to_numpy(lines.GetLines().GetConnectivityArray())
+    assert sorted(edge) == [0, 1]  # the one shared edge, original point ids
+    np.testing.assert_array_equal(np.asarray(lines.points), points)
+
+    empty = pv.Sphere().trueform.non_manifold_edges()
+    assert empty.GetNumberOfLines() == 0
+    assert empty.n_points == 0
+
+
+def test_accessor_non_manifold_paths():
+    points = np.array(
+        [[0, 0, 0], [1, 0, 0], [2, 0, 0],
+         [0.5, 1, 0], [0.5, -1, 0], [0.5, 0, 1],
+         [1.5, 1, 0], [1.5, -1, 0], [1.5, 0, 1]],
+        dtype=np.float32)
+    chain = _polydata(points, [[0, 1, 3], [0, 1, 4], [0, 1, 5],
+                               [1, 2, 6], [1, 2, 7], [1, 2, 8]])
+    paths = chain.trueform.non_manifold_paths()
+    assert paths.GetNumberOfLines() == 1
+    path = vtk_to_numpy(paths.GetLines().GetConnectivityArray())
+    assert sorted(path) == [0, 1, 2]  # the two edges, one polyline
+
+    assert pv.Sphere().trueform.non_manifold_paths().GetNumberOfLines() == 0
+
+
 # -- io ------------------------------------------------------------------
 
 

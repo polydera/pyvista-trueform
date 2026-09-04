@@ -7,11 +7,19 @@ Commercial licensing available via info@polydera.com.
 https://github.com/polydera/pyvista-trueform
 """
 
+import numpy as np
 import pyvista as pv
 import trueform as tf
 
-from .._conversion import to_pyvista
+from .._conversion import curves_to_pyvista, to_pyvista
 from .._forward import _forwarded
+
+
+def _edge_lines(edges, points):
+    """``(N, 2)`` vertex-id pairs as one-segment line cells over ``points``."""
+    offsets = np.arange(0, 2 * len(edges) + 2, 2, dtype=edges.dtype)
+    return curves_to_pyvista(
+        tf.OffsetBlockedArray(offsets, edges.reshape(-1)), points)
 
 
 class _TopologyMixin:
@@ -47,3 +55,31 @@ class _TopologyMixin:
         for component, label in zip(components, component_labels):
             blocks.append(to_pyvista(component), str(label))
         return blocks
+
+    def non_manifold_edges(self):
+        """Every edge shared by more than two faces, as a line-only PolyData.
+
+        One line cell per ``(N, 2)`` edge of
+        :func:`trueform.non_manifold_edges`, its two ids naming this
+        dataset's own points — the result carries the full point array, so
+        cell ids read straight back into the dataset. An empty PolyData
+        when the mesh is manifold.
+        """
+        edges = tf.non_manifold_edges(self.to_mesh())
+        if len(edges) == 0:
+            return pv.PolyData()
+        return _edge_lines(edges, self.to_mesh().points)
+
+    def non_manifold_paths(self):
+        """The non-manifold edges assembled into polylines.
+
+        The edges of :meth:`non_manifold_edges` connected through
+        :func:`trueform.connect_edges_to_paths`, one line cell per
+        polyline, ids naming this dataset's own points. An empty PolyData
+        when the mesh is manifold.
+        """
+        edges = tf.non_manifold_edges(self.to_mesh())
+        if len(edges) == 0:
+            return pv.PolyData()
+        return curves_to_pyvista(tf.connect_edges_to_paths(edges),
+                                 self.to_mesh().points)
