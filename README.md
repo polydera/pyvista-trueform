@@ -1,4 +1,4 @@
-# pyvista-trueform
+![pyvista-trueform](assets/header.png)
 
 ![Six overlapping spheres split into their domains by one csg_graph arrangement](assets/hero_domains_multiblock.png)
 
