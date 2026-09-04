@@ -664,6 +664,47 @@ def test_accessor_boundary_curves_of_plane():
     assert np.linalg.norm(steps, axis=1).sum() == 4.0  # unit-square rim
 
 
+# -- topology ------------------------------------------------------------
+
+
+def _two_spheres_concatenated():
+    """One PolyData holding two disjoint spheres, one soup."""
+    a = pv.Sphere()
+    b = pv.Sphere(center=(3.0, 0.0, 0.0))
+    points = np.vstack([a.points, b.points])
+    faces = np.vstack([a.regular_faces, b.regular_faces + a.n_points])
+    return _polydata(points, [list(f) for f in faces])
+
+
+def test_accessor_connected_components():
+    spheres = _two_spheres_concatenated()
+    n, labels = spheres.trueform.connected_components()
+    assert n == 2
+    assert labels.shape == (spheres.n_cells,)
+    # each source sphere is one component, and they differ
+    half = spheres.n_cells // 2
+    assert len(np.unique(labels[:half])) == 1
+    assert len(np.unique(labels[half:])) == 1
+    assert labels[0] != labels[-1]
+
+    n_hinted, labels_hinted = spheres.trueform.connected_components(
+        expected_number_of_components=2)
+    assert n_hinted == 2
+    np.testing.assert_array_equal(labels_hinted, labels)
+
+    assert pv.Sphere().trueform.connected_components()[0] == 1
+
+
+def test_accessor_split_components():
+    soup = _two_cubes_concatenated()
+    blocks = soup.trueform.split_components()
+    assert isinstance(blocks, pv.MultiBlock)
+    assert blocks.n_blocks == 2
+    for block in blocks:
+        assert block.n_cells == 12  # each cube's own 12 triangles
+        assert block.trueform.is_closed()
+
+
 # -- io ------------------------------------------------------------------
 
 
