@@ -93,12 +93,19 @@ serves `.trueform` too.
 ### IO
 
 - `read(path, *, index_dtype=None, ngon=None, dtype=None)` ->
-  `PolyData` — dispatched on suffix: `.stl` (parallel, duplicate
-  vertices welded), `.obj` (polygon sizes preserved); `ngon`/`dtype` are
-  `.obj`-only.
+  `PolyData` | `ImageData` — dispatched on suffix: `.stl` (parallel,
+  duplicate vertices welded), `.obj` (polygon sizes preserved), `.nii`
+  and `.nii.gz` (NIfTI-1, native sample dtype, the file's affine landing
+  on the grid). `ngon` is `.obj`-only; `dtype` is the point dtype for
+  `.obj` and the sample dtype for NIfTI.
 - `write(path, dataset, *, transformation=None)` — dispatched on suffix:
-  `.stl` (triangles only), `.obj` (any polygon sizes). Raises `OSError`
-  when trueform fails to write.
+  `.stl` (triangles only), `.obj` (any polygon sizes), `.nii` / `.nii.gz`
+  (the `ImageData`'s active point scalars, its placement composed into
+  the file's affine). Raises `OSError` when trueform fails to write;
+  `transformation` is mesh-only.
+- `trueform.read_nifti_header(path)` answers a file's facts (dtype,
+  dims, spacing, units, `posed`) without reading its samples — nothing
+  to convert, so it stays trueform's own call.
 
 ### N-ary CSG and arrangements
 

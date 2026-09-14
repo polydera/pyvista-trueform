@@ -1429,6 +1429,54 @@ def test_io_round_trip_obj(tmp_path):
         vtk_to_numpy(grid.GetPolys().GetConnectivityArray()))
 
 
+@pytest.mark.parametrize("name", ["field.nii", "field.nii.gz"])
+def test_io_round_trip_nifti(tmp_path, name):
+    field = _sphere_field()
+    path = tmp_path / name
+    tfpv.write(path, field)
+
+    back = tfpv.read(path)
+    assert isinstance(back, pv.ImageData)
+    assert back.dimensions == field.dimensions
+    assert back.active_scalars_name == "trueform_samples"
+    np.testing.assert_allclose(back.spacing, field.spacing, rtol=1e-6)
+    np.testing.assert_allclose(back.origin, field.origin, rtol=1e-6)
+    np.testing.assert_allclose(back.active_scalars, field.active_scalars,
+                               atol=1e-6)
+    assert back.trueform.isosurface().volume == pytest.approx(
+        4 / 3 * math.pi * SPHERE_RADIUS ** 3, rel=1e-2)
+
+
+def test_io_nifti_keeps_the_sample_type_and_the_patient_placement(tmp_path):
+    counts = (np.arange(4 * 5 * 6).reshape((4, 5, 6), order="F") * 7
+              ).astype(np.int16)
+    angle = 0.3
+    scan = _image(counts, spacing=(0.7, 0.7, 1.5), name="ct")
+    scan.direction_matrix = [[np.cos(angle), -np.sin(angle), 0.0],
+                             [np.sin(angle), np.cos(angle), 0.0],
+                             [0.0, 0.0, 1.0]]
+    scan.origin = (10.0, 20.0, 30.0)
+
+    path = tmp_path / "scan.nii.gz"
+    tfpv.write(path, scan)
+    back = tfpv.read(path)
+
+    # an int16 scan stays int16: the measurement is not widened for having
+    # crossed a file
+    assert back.active_scalars.dtype == np.int16
+    np.testing.assert_array_equal(back.active_scalars, scan.active_scalars)
+    np.testing.assert_allclose(back.spacing, scan.spacing, rtol=1e-6)
+    np.testing.assert_allclose(back.direction_matrix, scan.direction_matrix,
+                               atol=1e-6)
+    np.testing.assert_allclose(np.asarray(back.points),
+                               np.asarray(scan.points), atol=1e-5)
+
+    header = tf.read_nifti_header(str(path))
+    assert header.dtype == np.int16
+    assert header.dims == (4, 5, 6)
+    assert header.posed is True
+
+
 def test_io_refuses_unknown_suffix(tmp_path):
     with pytest.raises(ValueError, match=r"\.ply"):
         tfpv.read(tmp_path / "mesh.ply")
