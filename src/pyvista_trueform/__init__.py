@@ -20,7 +20,8 @@ from ._accessor import TrueformAccessor
 from ._agents import agents
 from ._colormaps import polydera_cmap, polydera_div, polydera_seq
 from ._conversion import (curves_to_pyvista, domains_to_pyvista,
-                          to_pyvista, to_trueform)
+                          to_pyvista, to_trueform, volume_to_pyvista,
+                          volume_to_trueform)
 from ._factory import (CsgGraph, csg_graph, domains, mesh_arrangements,
                        split_into_domains)
 from ._generators import box, cylinder, plane, sphere
@@ -64,5 +65,7 @@ __all__ = [
     "to_pyvista",
     "to_trueform",
     "tube",
+    "volume_to_pyvista",
+    "volume_to_trueform",
     "write",
 ]

@@ -21,10 +21,13 @@ point, so a bare `import pyvista` serves `.trueform` too.
    blocks, registration between two operands, generators, colormaps.
 
 2. **Outward, PyVista types.** Geometry answers as a fresh
-   `pyvista.PolyData`; anything plural answers as a `pyvista.MultiBlock`;
-   curves answer as line-only `PolyData`. trueform's label arrays ride
-   verbatim as cell data: `trueform_labels` (source operand, band, or
-   region) and `trueform_face_labels` (source face).
+   `pyvista.PolyData`; a scalar field answers as a fresh
+   `pyvista.ImageData`; anything plural answers as a
+   `pyvista.MultiBlock`; curves answer as line-only `PolyData`.
+   trueform's label arrays ride verbatim as cell data: `trueform_labels`
+   (source operand, band, or region) and `trueform_face_labels` (source
+   face); a field's samples ride as the `trueform_samples` point-data
+   array.
 
 3. **Inward, queries speak trueform primitives.** `tf.Point`,
    `tf.Segment`, `tf.Line`, `tf.Plane`, `tf.Triangle`, `tf.AABB`,
@@ -43,9 +46,11 @@ point, so a bare `import pyvista` serves `.trueform` too.
 
 6. **The boundary is loud.** Types, dtypes, and shapes are validated at
    entry with exact error messages: mesh conversions take polygon-only
-   `PolyData`, curve entries take line-only `PolyData`, points are
-   `(N, 3)` float32/float64, face indices int32/int64. A misspelled
-   keyword fails at this package's signature, not deep in trueform.
+   `PolyData`, curve entries take line-only `PolyData`, volume
+   conversions take `ImageData` with a single-component point-data array,
+   points are `(N, 3)` float32/float64, face indices int32/int64. A
+   misspelled keyword fails at this package's signature, not deep in
+   trueform.
 
 ## The module surface
 
@@ -65,6 +70,22 @@ point, so a bare `import pyvista` serves `.trueform` too.
   producer returns, as one tuple or two arguments.
 - `domains_to_pyvista(cells, ids)` -> `MultiBlock` — block `k` is domain
   `ids[k]`, named `str(ids[k])`; each block converts zero-copy.
+- `volume_to_trueform(dataset, scalars=None)` -> `trueform.Volume` —
+  copies the samples; detached by contract, like `to_trueform`. Reads
+  the dataset's active point scalars unless `scalars` names another
+  array; `dimensions`, `spacing` and `origin` pass through, and the
+  direction matrix becomes the volume's 4x4 world pose — a turn about
+  the dataset's own origin, so the volume's local space IS the dataset's
+  own and no direction can move a coordinate a caller already had. An
+  extent that does not start at zero (`extract_subset` keeping its
+  coordinates, a `.vti` with a nonzero `WholeExtent`) is folded into
+  that origin: a volume's first sample is the first one stored.
+- `volume_to_pyvista(volume)` -> `ImageData` — zero-copy; the samples
+  ride as the active `trueform_samples` point-data array, and the
+  volume's placement (`transformation @ (origin + index * spacing)`)
+  goes to PyVista's own `index_to_physical_matrix`, which splits it into
+  `origin`, `spacing` and `direction_matrix`. No baking: unlike a Mesh
+  transformation, a field's pose is carried by the grid.
 
 ### IO
 
@@ -391,11 +412,12 @@ readers forward and convert.
    (variable-sized) faces first — lossless. Operands with differing face
    index dtypes widen to int64.
 
-6. **Copy vs zero-copy is fixed by direction.** `to_trueform` copies —
-   detached by contract. `to_pyvista` and `curves_to_pyvista` are
-   zero-copy — VTK retains the NumPy buffers, so results stay valid
-   after the trueform inputs are released. The one exception: baking a
-   `trueform.Mesh` transformation into exported points copies them.
+6. **Copy vs zero-copy is fixed by direction.** `to_trueform` and
+   `volume_to_trueform` copy — detached by contract. `to_pyvista`,
+   `curves_to_pyvista` and `volume_to_pyvista` are zero-copy — VTK
+   retains the NumPy buffers, so results stay valid after the trueform
+   inputs are released. The one exception: baking a `trueform.Mesh`
+   transformation into exported points copies them.
 
 7. **The escape hatches.** `dataset.trueform.to_mesh()` and
    `to_trueform` cross into trueform's own Python API; `to_pyvista`
@@ -409,12 +431,32 @@ readers forward and convert.
    `polydera_cmap(values)` picks between them by whether the values
    cross zero.
 
+9. **A volume's placement crosses as a placement.** `spacing`,
+   `dimensions` and `origin` pass through in both directions; the
+   `direction_matrix` is the volume's 4x4 `transformation` and vice
+   versa, as a turn about the dataset's own origin — so the volume's
+   local space IS the dataset's own axis-aligned space, a plane or a
+   resample grid is stated in the coordinates the dataset already
+   speaks, and an undirected grid composes to exactly the identity,
+   which trueform reads as unposed. Nothing is baked into samples, which
+   is why this stays zero-copy outward even when directed. Three edges:
+   the round trip lands in the grid's own `coordinate_dtype` (float32
+   for a float32 or integer field), so a float64 placement returns
+   rounded; a pose that shears the grid has no such split and PyVista
+   refuses it in `index_to_physical_matrix`, naming the shear; and
+   trueform keys clamp-versus-sentinel on the pose's presence by exact
+   equality, so a direction that merely rounds to the identity is still
+   a pose — a resample or boolean will read the far-outside sentinel
+   past its box rather than clamping at the edge.
+
 ## When you need more
 
 This package binds where trueform produces the fact and PyVista holds the
 dataset. trueform's own Python API — expressions, point clouds, primitives,
-index maps, everything — is one conversion away: `to_trueform(dataset)` or
-`dataset.trueform.to_mesh()` inward, `to_pyvista(...)` /
-`curves_to_pyvista(...)` outward, `CsgGraph.native` for a built graph.
-What PyVista already does well (plain normals, smoothing, general IO)
-stays PyVista's; this package does not shadow it.
+index maps, everything — is one conversion away: `to_trueform(dataset)`,
+`dataset.trueform.to_mesh()` or `volume_to_trueform(image)` inward,
+`to_pyvista(...)` / `curves_to_pyvista(...)` /
+`volume_to_pyvista(...)` outward,
+`CsgGraph.native` for a built graph. What PyVista already does well
+(plain normals, smoothing, general IO) stays PyVista's; this package
+does not shadow it.

@@ -1,8 +1,10 @@
 # pyvista-trueform agent contract
 
 This package is a boundary and nothing more: PyVista datasets in, trueform
-results out, ~1000 lines total. trueform owns every computation; PyVista owns
-every dataset. Work here is judged by whether the boundary stays this thin.
+results out — about 2,800 lines under `src/`, of which some 1,100 are code
+and the rest is the contract each entry states. trueform owns every
+computation; PyVista owns every dataset. Work here is judged by whether the
+boundary stays this thin.
 
 Developed jointly by Žiga Sajovic and Claude.
 
@@ -16,12 +18,18 @@ Developed jointly by Žiga Sajovic and Claude.
    Never partial refresh, never per-array owners, never storage tracking —
    that design was considered and rejected as overengineering.
 
-2. **Conversion direction decides copying.** `to_trueform` copies — the
-   mesh is detached from the dataset by contract. `to_pyvista` and
-   `curves_to_pyvista` are zero-copy: trueform's offset-block layout IS
-   VTK 9's cell-array layout, and VTK retains the NumPy buffers. The one
-   exception is a baked `trueform.Mesh` transformation, which must copy
-   points; nothing else may quietly copy or quietly alias.
+2. **Conversion direction decides copying.** `to_trueform` and
+   `volume_to_trueform` copy — the result is detached from the dataset by
+   contract. `to_pyvista`, `curves_to_pyvista` and `volume_to_pyvista` are
+   zero-copy: trueform's offset-block layout IS VTK 9's cell-array layout,
+   a volume's samples ARE VTK's flat x-fastest point data, and VTK retains
+   the NumPy buffers. The one exception is a baked `trueform.Mesh`
+   transformation, which must copy points; nothing else may quietly copy
+   or quietly alias. A `trueform.Volume` pose is never baked — the grid
+   carries it as origin + spacing + direction, which is why that direction
+   stays zero-copy even when posed, and the pose is a turn about the
+   dataset's own origin so that crossing never redefines the coordinates a
+   caller already holds.
 
 3. **Nothing is rederived.** This package never computes geometry,
    topology, or labels — it converts, forwards to trueform's public Python
@@ -39,10 +47,11 @@ Developed jointly by Žiga Sajovic and Claude.
    `tf.Point` — a points-only PyVista dataset wraps its `.points` as one
    batched primitive, never a refusal, never a second path. Outward,
    readers answer in PyVista types: `PolyData` with labels as cell data,
-   `MultiBlock` for anything plural, line PolyData for curves — the
-   `CsgGraph` wrapper exists for exactly this, with `.native` as the one
-   escape hatch. And every value this package names "distance" is
-   euclidean; a squared metric is converted at the boundary, once.
+   `MultiBlock` for anything plural, line PolyData for curves, `ImageData`
+   for a scalar field — the `CsgGraph` wrapper exists for exactly this,
+   with `.native` as the one escape hatch. And every value this package
+   names "distance" is euclidean; a squared metric is converted at the
+   boundary, once.
 
 6. **Every claim is a fixture.** Cache identity (`is`), the raw-mutation
    MTime gotcha, zero-copy owner-safety under `gc`, entry-point
@@ -64,6 +73,11 @@ Developed jointly by Žiga Sajovic and Claude.
   passthroughs beyond `read`/`write` are its idioms, and this package
   does not shadow them — a binding earns its place only where trueform
   produces the fact.
+- PyVista owns a dataset's placement, so the volume conversions hand it
+  back its own vocabulary: the composed placement goes to
+  `index_to_physical_matrix`, and PyVista's decomposition — including
+  its shear refusal — is the one producer of `origin`, `spacing` and
+  `direction_matrix`. This package never decomposes a matrix itself.
 
 ## Working here
 

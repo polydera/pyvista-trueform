@@ -204,6 +204,28 @@ def test_to_pyvista_rejects_bad_input():
                          np.empty((4, 3), dtype=np.float32)))
 
 
+def test_empty_products_convert_to_valid_polydata():
+    """VTK reads a cell count off the offsets array, so a producer with no
+    cells still has to hand over the terminator; without it the count
+    reads -1 and poisons every filter downstream."""
+    def blocks():
+        return tf.OffsetBlockedArray(np.empty(0, dtype=np.int32),
+                                     np.empty(0, dtype=np.int32))
+
+    points = np.empty((0, 3), dtype=np.float32)
+    curves = tfpv.curves_to_pyvista(blocks(), points)
+    assert curves.n_cells == 0
+    assert curves.GetNumberOfLines() == 0
+    assert curves.copy().n_cells == 0
+    assert curves.extract_cells(np.array([], dtype=np.int64)).n_cells == 0
+    assert curves.merge(pv.Line()).n_cells == 1
+
+    faces = tfpv.to_pyvista((blocks(), points))
+    assert faces.n_cells == 0
+    assert faces.GetNumberOfPolys() == 0
+    assert faces.copy().n_cells == 0
+
+
 def test_curves_to_pyvista_two_arguments_and_tuple():
     paths = tf.OffsetBlockedArray(
         np.array([0, 3, 5], dtype=np.int32),
@@ -862,6 +884,251 @@ def test_accessor_boundary_edges_and_paths():
     assert pv.Sphere().trueform.boundary_paths().GetNumberOfLines() == 0
 
 
+# -- volumes -------------------------------------------------------------
+
+
+SAMPLE_DTYPES = [np.float32, np.float64, np.int16, np.uint16, np.uint8]
+
+
+def _image(samples, spacing=(1.0, 1.0, 1.0), origin=(0.0, 0.0, 0.0),
+           name="field"):
+    """Axis-aligned ImageData carrying `samples` as its active point data."""
+    image = pv.ImageData(dimensions=samples.shape, spacing=spacing,
+                         origin=origin)
+    image.point_data[name] = np.asfortranarray(samples).ravel(order="F")
+    return image
+
+
+def _polyline_length(curves):
+    path = vtk_to_numpy(curves.GetLines().GetConnectivityArray())
+    steps = np.diff(np.asarray(curves.points)[path], axis=0)
+    return float(np.linalg.norm(steps, axis=1).sum())
+
+
+def _world_of(volume, index):
+    """Where a trueform Volume places one of its own samples."""
+    local = np.asarray(volume.origin) + np.asarray(index) * np.asarray(
+        volume.spacing)
+    if volume.transformation is None:
+        return local
+    pose = np.asarray(volume.transformation)
+    return pose[:3, :3] @ local + pose[:3, 3]
+
+
+def _subset_with_nonzero_extent():
+    full = pv.ImageData(dimensions=(6, 5, 4), spacing=(1.0, 2.0, 3.0),
+                        origin=(10.0, 20.0, 30.0))
+    full.point_data["f"] = np.arange(full.n_points, dtype=np.float32)
+    return full.extract_subset((2, 4, 1, 3, 0, 2), rebase_coordinates=False)
+
+
+def test_volume_conversion_order_is_x_fastest():
+    """The landmark: VTK's point order and trueform's voxel order are the
+    one flat x-fastest run, so a sample lands on the point its index
+    names."""
+    samples = np.zeros((3, 4, 5), dtype=np.float32, order="F")
+    landmarks = {1.0: (1, 0, 0), 2.0: (0, 1, 0), 3.0: (0, 0, 1)}
+    for value, index in landmarks.items():
+        samples[index] = value
+    spacing, origin = (1.0, 2.0, 3.0), (10.0, 20.0, 30.0)
+
+    image = tfpv.volume_to_pyvista(
+        tf.Volume(samples, spacing=spacing, origin=origin))
+    flat = image.point_data["trueform_samples"]
+    assert flat.shape == (60,)
+    for value, index in landmarks.items():
+        (where,) = np.flatnonzero(flat == value)
+        np.testing.assert_array_equal(
+            image.points[where],
+            np.asarray(origin) + np.asarray(index) * np.asarray(spacing))
+    assert np.flatnonzero(flat == 1.0)[0] == 1   # x fastest
+    assert np.flatnonzero(flat == 2.0)[0] == 3   # then y, by nx
+    assert np.flatnonzero(flat == 3.0)[0] == 12  # then z, by nx * ny
+
+
+@pytest.mark.parametrize("sample_dtype", SAMPLE_DTYPES)
+def test_volume_round_trip_dtypes(sample_dtype):
+    samples = (np.arange(3 * 4 * 5).reshape((3, 4, 5), order="F")
+               .astype(sample_dtype))
+    spacing, origin = (0.7, 0.7, 1.5), (-1.0, 2.0, 0.5)
+
+    volume = tf.Volume(samples, spacing=spacing, origin=origin)
+    image = tfpv.volume_to_pyvista(volume)
+    assert isinstance(image, pv.ImageData)
+    assert image.dimensions == (3, 4, 5)
+    assert image.n_points == 60
+    assert image.active_scalars_name == "trueform_samples"
+    assert image.active_scalars.dtype == np.dtype(sample_dtype)
+    np.testing.assert_allclose(image.spacing, spacing, rtol=1e-6)
+    np.testing.assert_allclose(image.origin, origin, rtol=1e-6)
+    np.testing.assert_array_equal(image.direction_matrix, np.eye(3))
+
+    back = tfpv.volume_to_trueform(image)
+    assert isinstance(back, tf.Volume)
+    assert back.dtype == np.dtype(sample_dtype)
+    assert back.dims == (3, 4, 5)
+    assert back.transformation is None
+    np.testing.assert_allclose(back.spacing, spacing, rtol=1e-6)
+    np.testing.assert_allclose(back.origin, origin, rtol=1e-6)
+    np.testing.assert_array_equal(np.asarray(back.samples), samples)
+
+
+def test_volume_to_pyvista_is_zero_copy_and_owner_safe():
+    volume = tf.Volume(np.zeros((4, 4, 4), dtype=np.float32, order="F"))
+    volume.samples[1, 2, 3] = -7.0
+    image = tfpv.volume_to_pyvista(volume)
+    assert np.shares_memory(image.point_data["trueform_samples"],
+                            volume.samples)
+
+    del volume
+    gc.collect()
+    assert image.point_data["trueform_samples"].min() == -7.0
+
+
+def test_volume_to_trueform_is_detached():
+    image = _image(np.zeros((4, 4, 4), dtype=np.float32))
+    volume = tfpv.volume_to_trueform(image)
+    assert not np.shares_memory(volume.samples, image.point_data["field"])
+
+    image.point_data["field"][:] = 5.0
+    assert np.asarray(volume.samples).max() == 0.0
+
+
+def test_volume_round_trip_pose():
+    samples = np.zeros((3, 4, 5), dtype=np.float32, order="F")
+    samples[1, 0, 0] = 1.0
+    spacing, origin = (1.0, 2.0, 3.0), (10.0, 20.0, 30.0)
+    angle = 0.4
+    pose = np.eye(4, dtype=np.float32)
+    pose[:2, :2] = [[np.cos(angle), -np.sin(angle)],
+                    [np.sin(angle), np.cos(angle)]]
+    pose[:3, 3] = [1.0, 2.0, 3.0]
+    volume = tf.Volume(samples, spacing=spacing, origin=origin)
+    volume.transformation = pose
+
+    image = tfpv.volume_to_pyvista(volume)
+    np.testing.assert_allclose(image.direction_matrix, pose[:3, :3],
+                               atol=1e-6)
+    np.testing.assert_allclose(image.spacing, spacing, rtol=1e-6)
+    # the pose rides on the grid: every voxel stands where the volume
+    # places it, origin + index * spacing carried through the pose
+    for index in [(0, 0, 0), (1, 0, 0), (2, 3, 4)]:
+        local = np.asarray(origin) + np.asarray(index) * np.asarray(spacing)
+        where = np.ravel_multi_index(index, image.dimensions, order="F")
+        np.testing.assert_allclose(
+            image.points[where], pose[:3, :3] @ local + pose[:3, 3],
+            atol=1e-5)
+
+    # and back: the same world placement, sample by sample, in the
+    # grid's own coordinate type
+    back = tfpv.volume_to_trueform(image)
+    assert back.transformation is not None
+    assert back.transformation.dtype == back.coordinate_dtype
+    np.testing.assert_array_equal(np.asarray(back.samples), samples)
+    for index in [(0, 0, 0), (1, 0, 0), (2, 3, 4)]:
+        local = np.asarray(origin) + np.asarray(index) * np.asarray(spacing)
+        np.testing.assert_allclose(
+            _world_of(back, index), pose[:3, :3] @ local + pose[:3, 3],
+            atol=1e-5)
+
+
+@pytest.mark.parametrize("route", ["extract_subset", "vti"])
+def test_volume_nonzero_extent_places_the_first_stored_sample(tmp_path, route):
+    """A dataset whose extent does not start at zero states its origin at
+    extent index (0, 0, 0), not at the sample it stores first — both
+    routes into one carry the offset into the volume's own origin."""
+    dataset = _subset_with_nonzero_extent()
+    if route == "vti":
+        dataset.save(tmp_path / "subset.vti")
+        dataset = pv.read(tmp_path / "subset.vti")
+    assert dataset.extent[::2] == (2, 1, 0)
+
+    volume = tfpv.volume_to_trueform(dataset)
+    assert volume.dims == dataset.dimensions
+    for index in [(0, 0, 0), (1, 2, 1), (2, 2, 2)]:
+        where = np.ravel_multi_index(index, dataset.dimensions, order="F")
+        np.testing.assert_allclose(_world_of(volume, index),
+                                   dataset.points[where], atol=1e-6)
+        assert np.asarray(volume.samples)[index] == \
+            dataset.active_scalars[where]
+
+
+def _directed(dataset, degrees=30.0):
+    """The same grid, turned about its own origin by a direction matrix."""
+    angle = np.radians(degrees)
+    dataset.direction_matrix = [[np.cos(angle), -np.sin(angle), 0.0],
+                                [np.sin(angle), np.cos(angle), 0.0],
+                                [0.0, 0.0, 1.0]]
+    return dataset
+
+
+def test_volume_direction_keeps_the_datasets_own_coordinates():
+    """A direction matrix is a turn about the dataset's own origin, so the
+    volume's local space stays the space the dataset's origin and spacing
+    speak, and every sample still stands where VTK puts it."""
+    field = _directed(_image(np.zeros((6, 5, 4), dtype=np.float32),
+                             spacing=(1.0, 2.0, 3.0),
+                             origin=(10.0, 20.0, 30.0)))
+
+    volume = tfpv.volume_to_trueform(field)
+    np.testing.assert_allclose(volume.origin, field.origin, atol=1e-6)
+    for index in [(0, 0, 0), (1, 2, 1), (5, 4, 3)]:
+        where = np.ravel_multi_index(index, field.dimensions, order="F")
+        np.testing.assert_allclose(_world_of(volume, index),
+                                   field.points[where], atol=1e-5)
+
+    # the same rule leaves an undirected grid exactly unposed
+    plain = _image(np.zeros((3, 3, 3), dtype=np.float32),
+                   origin=(1.0, 2.0, 3.0))
+    assert tfpv.volume_to_trueform(plain).transformation is None
+    np.testing.assert_array_equal(
+        tfpv.volume_to_trueform(plain).origin, plain.origin)
+
+
+def test_volume_to_pyvista_refuses_a_shearing_pose():
+    volume = tf.Volume(np.zeros((3, 3, 3), dtype=np.float32, order="F"))
+    pose = np.eye(4, dtype=np.float32)
+    pose[0, 1] = 0.5  # a shear no axis-aligned grid can hold
+    volume.transformation = pose
+    with pytest.raises(ValueError, match="shear"):
+        tfpv.volume_to_pyvista(volume)
+
+
+def test_volume_conversions_name_their_refusals():
+    with pytest.raises(TypeError, match="pyvista.ImageData"):
+        tfpv.volume_to_trueform(_cube())
+    with pytest.raises(TypeError, match="trueform.Volume"):
+        tfpv.volume_to_pyvista(object())
+
+    bare = pv.ImageData(dimensions=(2, 2, 2))
+    with pytest.raises(ValueError, match="no active point-data scalars"):
+        tfpv.volume_to_trueform(bare)
+
+    image = _image(np.zeros((2, 2, 2), dtype=np.float32))
+    with pytest.raises(ValueError, match="'missing'"):
+        tfpv.volume_to_trueform(image, scalars="missing")
+
+    image.point_data["vectors"] = np.zeros((8, 3), dtype=np.float32)
+    with pytest.raises(ValueError, match="single-component"):
+        tfpv.volume_to_trueform(image, scalars="vectors")
+
+
+def test_volume_cell_data_refusal_names_the_way_out():
+    """Cell data is not a node field, and set_active_scalars alone cannot
+    make it one — the refusal names the arrays and the route that can."""
+    cells = pv.ImageData(dimensions=(3, 3, 3))
+    cells.cell_data["density"] = np.zeros(cells.n_cells, dtype=np.float32)
+    with pytest.raises(ValueError) as raised:
+        tfpv.volume_to_trueform(cells)
+    assert "'density'" in str(raised.value)
+    assert "cell_data_to_point_data()" in str(raised.value)
+
+    moved = cells.cell_data_to_point_data()
+    assert tfpv.volume_to_trueform(moved).dims == (3, 3, 3)
+
+
+
+
 # -- io ------------------------------------------------------------------
 
 
@@ -1507,6 +1774,7 @@ def test_examples_compute():
     assert (field < 0).any() and (field > 0).any()
 
 
+
 # -- packaging -----------------------------------------------------------
 
 
@@ -1529,17 +1797,29 @@ def test_agents_serves_the_shipped_contract():
     assert text == resource.read_text(encoding="utf-8")
 
 
+def _contract_section(text, heading):
+    """One section of the contract, up to the next same-level heading."""
+    start = text.index(heading)
+    end = text.find("\n## ", start + len(heading))
+    return text[start:len(text) if end < 0 else end]
+
+
 def test_agents_names_every_public_export():
     """The drift guard: a name added to the surface without joining the
-    contract document fails here, loudly."""
+    contract document fails here, loudly — and each carrier's methods are
+    checked against the section that names THAT carrier, so a whole
+    section going missing cannot be covered by a namesake elsewhere."""
     text = tfpv.agents()
     exports = [name for name in tfpv.__all__ if not name.startswith("_")]
-    accessor_methods = [name for name in dir(tfpv.TrueformAccessor)
-                        if not name.startswith("_")]
-    graph_methods = [name for name in dir(tfpv.CsgGraph)
-                     if not name.startswith("_")]
-    assert exports and accessor_methods and graph_methods
-    missing = [name
-               for name in (*exports, *accessor_methods, *graph_methods)
-               if name not in text]
-    assert missing == []
+    assert exports
+    assert [name for name in exports if name not in text] == []
+
+    owners = [
+        (tfpv.TrueformAccessor, "## The accessor: `dataset.trueform`"),
+        (tfpv.CsgGraph, "## The CsgGraph wrapper"),
+    ]
+    for owner, heading in owners:
+        section = _contract_section(text, heading)
+        methods = [name for name in dir(owner) if not name.startswith("_")]
+        assert methods
+        assert [name for name in methods if name not in section] == []

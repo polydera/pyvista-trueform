@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "pyvista-trueform"
 version = "0.2.0"
-description = "PyVista accessor for trueform: exact mesh booleans, arrangements, intersection curves, and scalar-field cuts."
+description = "PyVista accessor for trueform: exact mesh booleans, arrangements, intersection curves, scalar-field cuts, and volume SDFs."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { file = "LICENSE.noncommercial" }
@@ -20,9 +20,12 @@ keywords = [
   "mesh-boolean",
   "csg",
   "computational-geometry",
+  "isosurface",
+  "signed-distance-field",
+  "nifti",
 ]
 dependencies = [
-  "trueform>=0.10.3",
+  "trueform>=0.10.4",
   "pyvista>=0.48",
   "numpy>=1.23",
 ]
