@@ -4,8 +4,9 @@
 
 Exact mesh booleans, intersection curves, self-intersection repair,
 isocontours and isobands, and N-ary CSG on [PyVista](https://pyvista.org)
-meshes. PyVista in, PyVista out, through one `.trueform` accessor on
-`pyvista.PolyData`.
+meshes — plus signed distance fields, field CSG and isosurfacing on
+PyVista volumes. PyVista in, PyVista out, through one `.trueform`
+accessor on `pyvista.PolyData` and on `pyvista.ImageData`.
 
 ## Getting Started
 
@@ -14,13 +15,16 @@ pip install pyvista-trueform
 ```
 
 **The accessor** registers itself on import and answers through
-`.trueform` on any `pyvista.PolyData`:
+`.trueform` on any `pyvista.PolyData` — and, for scalar fields, on any
+`pyvista.ImageData`:
 
 ```python
 import pyvista as pv
-import pyvista_trueform  # registers the accessor
+import pyvista_trueform as tfpv  # registers the accessors
 
 pv.Cube().trueform.volume()
+tfpv.sphere_sdf((32,) * 3, (0.1,) * 3, (-1.6,) * 3, (0, 0, 0), 1.0) \
+    .trueform.isosurface()
 ```
 
 **The cache** is whole-value, keyed by the dataset's VTK modification
@@ -95,11 +99,14 @@ csg_graph([a])                        # one operand is legal: its own self arran
 copies:
 
 ```python
-from pyvista_trueform import to_trueform, to_pyvista, curves_to_pyvista
+from pyvista_trueform import (to_trueform, to_pyvista, curves_to_pyvista,
+                             volume_to_trueform, volume_to_pyvista)
 
 mesh = to_trueform(a)                        # detached trueform.Mesh, copies the geometry
 to_pyvista(mesh)                             # zero-copy: shares mesh's own NumPy buffers
 curves_to_pyvista(tf.boundary_curves(mesh))  # any (paths, points) pair, zero-copy
+volume_to_pyvista(tf.sphere_sdf((16,) * 3, (0.25,) * 3, (-2.0,) * 3,
+                                (0, 0, 0), 1.0))  # a field as ImageData, zero-copy
 ```
 
 ### IO
@@ -112,6 +119,10 @@ read("cube.obj")                              # zero-copy conversion back to Pol
 
 write("cube.stl", a.trueform.triangulated())  # STL: triangles only
 read("cube.stl")                              # STL welds duplicate vertices on the way in
+
+ball = tfpv.sphere_sdf((16,) * 3, (0.25,) * 3, (-2.0,) * 3, (0, 0, 0), 1.0)
+write("ball.nii.gz", ball)                    # NIfTI-1: the volume's active point scalars
+read("ball.nii.gz")                           # ImageData back, in the file's own dtype
 ```
 
 ### Domains and N-ary arrangements
@@ -142,6 +153,51 @@ ray = tf.Ray(origin=np.array([-2, 0, 0], dtype=np.float32),
 pick(blocks, ray)                 # hit.block_index, hit.point: first block struck
 closest(blocks, [0.0, 0.0, 0.0])  # same shape, by proximity instead of a ray
 ```
+
+### Volumes
+
+A scalar field is a `pyvista.ImageData` under the same `.trueform`
+accessor: the samples are its active point data, the grid is its own
+placement. A scan carries the file's affine, so its isosurface lands in
+patient space with nothing further to do:
+
+```python
+scan = tfpv.read("ct.nii.gz")           # NIfTI in, ImageData out, samples still int16
+bone = scan.trueform.isosurface(300.0)  # the Hounsfield level set, in patient space
+bone.plot()
+```
+
+A mesh states its own field, and a field states a mesh back:
+
+```python
+field = a.trueform.signed_distance_field((33,) * 3, (0.05,) * 3, (-0.8,) * 3)
+field.active_scalars.min()              # -0.5: negative inside a, zero on its surface
+
+field.trueform.isosurface()                          # back to a surface
+field.trueform.isosurface(0.1)                       # offset outward by 0.1
+field.trueform.isosurface(method="dual_contouring")  # creases and corners survive
+
+a.trueform.signed_distance_field((33,) * 3, (0.05,) * 3, (-0.8,) * 3,
+                                 mode="banded", band=3)  # ~10x faster
+```
+
+Fields carve like solids, regrid, and slice:
+
+```python
+ball = tfpv.sphere_sdf((33,) * 3, (0.05,) * 3, (-0.8,) * 3, (0, 0, 0), 0.6)
+
+carved = field.trueform.difference(ball)   # .union() and .intersection() too
+carved.trueform.isosurface()               # exactly the boolean of the two solids
+
+field.trueform.resampled((17,) * 3, (0.1,) * 3, (-0.8,) * 3)
+field.trueform.slice_contours((-0.8, -0.8, 0.0), (1, 0, 0), (0, 1, 0),
+                             (128, 128), (0.0125, 0.0125), 0.0)
+```
+
+Field CSG is bound by the grid's resolution where the mesh booleans above
+are exact everywhere — reach for fields when the input already is one,
+when the shapes are offsets or blends, and for meshes when you want the
+operands back unchanged.
 
 ### Remesh
 
