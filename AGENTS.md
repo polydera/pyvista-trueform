@@ -16,7 +16,14 @@ Developed jointly by Žiga Sajovic and Claude.
    trueform's lazily built structures (tree, face membership, edge link)
    amortize. When it changes, the mesh is discarded whole and rebuilt.
    Never partial refresh, never per-array owners, never storage tracking —
-   that design was considered and rejected as overengineering.
+   that design was considered and rejected as overengineering. The volume
+   accessor on `pyvista.ImageData` holds one `trueform.Volume` under the
+   same law, keyed by MTime and the array read — the array, never the
+   spelling of the request; there the cache also buys the sample copy the
+   conversion owes. Its MTime is livelier than a mesh's: a VTK data array
+   notifies its dataset, so a sample edited through the dataset rebuilds
+   the volume by itself, and only a write through a NumPy handle held
+   from outside VTK needs `Modified()`.
 
 2. **Conversion direction decides copying.** `to_trueform` and
    `volume_to_trueform` copy — the result is detached from the dataset by
@@ -72,7 +79,9 @@ Developed jointly by Žiga Sajovic and Claude.
   (`compute_normals`), smoothing (`smooth`, `smooth_taubin`), and IO
   passthroughs beyond `read`/`write` are its idioms, and this package
   does not shadow them — a binding earns its place only where trueform
-  produces the fact.
+  produces the fact. `image.trueform.isosurface()` is not a second
+  `contour()`: it is where dual contouring, the welded indexed output,
+  and the grid's own pose come from.
 - PyVista owns a dataset's placement, so the volume conversions hand it
   back its own vocabulary: the composed placement goes to
   `index_to_physical_matrix`, and PyVista's decomposition — including

@@ -16,7 +16,7 @@ try:
 except Exception:
     __version__ = "0.0.0"
 
-from ._accessor import TrueformAccessor
+from ._accessor import TrueformAccessor, TrueformVolumeAccessor
 from ._agents import agents
 from ._colormaps import polydera_cmap, polydera_div, polydera_seq
 from ._conversion import (curves_to_pyvista, domains_to_pyvista,
@@ -31,6 +31,7 @@ from ._pick import ClosestHit, RayHit, closest, pick
 from ._registration import (align_icp, align_knn, align_obb, align_rigid,
                             align_similarity, chamfer_distance)
 from ._tube import tube
+from ._volume import sphere_sdf
 
 __all__ = [
     "__version__",
@@ -38,6 +39,7 @@ __all__ = [
     "CsgGraph",
     "RayHit",
     "TrueformAccessor",
+    "TrueformVolumeAccessor",
     "agents",
     "align_icp",
     "align_knn",
@@ -61,6 +63,7 @@ __all__ = [
     "polydera_seq",
     "read",
     "sphere",
+    "sphere_sdf",
     "split_into_domains",
     "to_pyvista",
     "to_trueform",

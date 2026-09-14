@@ -1,5 +1,6 @@
 """
-The .trueform accessor on pyvista.PolyData
+The .trueform accessors: mesh operations on pyvista.PolyData, field
+operations on pyvista.ImageData
 
 Copyright (c) 2025 Žiga Sajovic, XLAB
 Licensed for noncommercial use under the PolyForm Noncommercial License 1.0.0.
@@ -34,10 +35,12 @@ from ._queries import _QueriesMixin
 from ._remesh import _RemeshMixin
 from ._repair import _RepairMixin
 from ._topology import _TopologyMixin
+from ._volume import TrueformVolumeAccessor, _VolumeMixin
 
 
 class TrueformAccessor(_BooleansMixin, _CurvesMixin, _IsoMixin, _RepairMixin,
-                       _RemeshMixin, _TopologyMixin, _QueriesMixin):
+                       _RemeshMixin, _TopologyMixin, _QueriesMixin,
+                       _VolumeMixin):
     """trueform operations exposed as ``polydata.trueform.<method>(...)``.
 
     The accessor converts the dataset into a :class:`trueform.Mesh` once and
@@ -107,6 +110,7 @@ class TrueformAccessor(_BooleansMixin, _CurvesMixin, _IsoMixin, _RepairMixin,
 
 
 pv.register_dataset_accessor("trueform", pv.PolyData)(TrueformAccessor)
+pv.register_dataset_accessor("trueform", pv.ImageData)(TrueformVolumeAccessor)
 
 
-__all__ = ["TrueformAccessor"]
+__all__ = ["TrueformAccessor", "TrueformVolumeAccessor"]

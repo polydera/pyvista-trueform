@@ -9,16 +9,19 @@ so an agent driving the package in a live session can query the laws and
 the surface without leaving it.
 
 `import pyvista_trueform` registers the `.trueform` accessor on
-`pyvista.PolyData` and the Polydera colormaps with matplotlib. Installed
-wheels also reach the accessor through PyVista's `pyvista.accessors` entry
-point, so a bare `import pyvista` serves `.trueform` too.
+`pyvista.PolyData` and on `pyvista.ImageData`, and the Polydera colormaps
+with matplotlib. Installed wheels also reach the accessors through
+PyVista's `pyvista.accessors` entry point, so a bare `import pyvista`
+serves `.trueform` too.
 
 ## The dialect laws
 
-1. **One accessor.** Mesh operations live on `.trueform` of
-   `pyvista.PolyData`; module-level functions exist only for what is not
-   one dataset's method — conversions, IO, N-ary CSG, picking across
-   blocks, registration between two operands, generators, colormaps.
+1. **One accessor name, one per carrier.** Mesh operations live on
+   `.trueform` of `pyvista.PolyData`, scalar-field operations on
+   `.trueform` of `pyvista.ImageData`; module-level functions exist only
+   for what is not one dataset's method — conversions, IO, N-ary CSG,
+   picking across blocks, registration between two operands, generators,
+   colormaps.
 
 2. **Outward, PyVista types.** Geometry answers as a fresh
    `pyvista.PolyData`; a scalar field answers as a fresh
@@ -191,6 +194,14 @@ float32, int32).
 - `plane(width, height, *, width_ticks=None, height_ticks=None,
   dtype=None, index_dtype=None)` — XY plane, normal +z.
 
+### Volumes
+
+- `sphere_sdf(dims, spacing, origin, center, radius, *, dtype=None)` ->
+  `ImageData` — the analytic sphere field, `distance(point, center) -
+  radius` per sample. The only module-level field generator; a mesh's own
+  field is `dataset.trueform.signed_distance_field(...)`, and everything
+  a field answers lives on `image.trueform`.
+
 ### Colormaps
 
 - `polydera_seq()` — the Polydera sequential map, registered with
@@ -203,8 +214,10 @@ float32, int32).
 ### Introspection
 
 - `agents()` -> str — this document.
-- `TrueformAccessor` — the accessor class itself, registered on
+- `TrueformAccessor` — the mesh accessor class itself, registered on
   `pyvista.PolyData`.
+- `TrueformVolumeAccessor` — the field accessor class, registered on
+  `pyvista.ImageData`.
 - `__version__` — the installed distribution version.
 
 ## The accessor: `dataset.trueform`
@@ -349,6 +362,112 @@ face) the surviving labels ride as `trueform_labels`.
   `(k0, k1)`; with `directions=True` also `(d0, d1)`.
 - `shape_index(*, k=None)` — per-vertex shape index in `[-1, 1]`.
 
+### The field a mesh states
+
+- `signed_distance_field(dims, spacing, origin, *, dtype=None,
+  mode=None, band=None)` -> `ImageData` — this mesh's signed distance
+  field on the stated grid: negative inside, zero on the surface, the
+  magnitude the euclidean distance to it. The sign is crossing parity,
+  so it wants a CLOSED mesh — nothing refuses an open one, it simply has
+  no inside and answers a nonnegative field, which is the silent way to
+  get a wrong offset; `outer_shell()` repairs a mesh that should have
+  had one. The grid samples this dataset's own coordinates, so build
+  `dims` / `spacing` / `origin` from its `bounds`. `mode="banded"` measures only samples
+  within `band` voxels of the surface and sweeps the far field — an
+  order of magnitude faster, sign exact everywhere, magnitude exact
+  inside the band.
+
+## The volume accessor: `image.trueform`
+
+Registered on `pyvista.ImageData` under the same `.trueform` name, with
+the same cache contract: the dataset's active point scalars convert into
+a `trueform.Volume` once, keyed by the dataset's VTK MTime and the array
+read, and every call reuses that instance while both hold. The
+conversion COPIES the samples, so the cache is what keeps a 512-cubed
+scan from being copied per call. Which array is the field is PyVista's
+question: `image.set_active_scalars("ct")` selects one.
+
+The MTime behaves differently here than on a mesh, in the caller's
+favour: a VTK data array notifies its dataset, so editing samples
+through the dataset (`image.point_data["ct"][k] = ...`,
+`image.active_scalars[...] = ...`) advances the MTime and the cache
+rebuilds by itself — where the same edit through a `PolyData`'s raw
+points would not. What reaches no VTK object is a write through a NumPy
+array handed to VTK earlier and still held outside, which is exactly the
+buffer `volume_to_pyvista` shares with its volume; call
+`image.Modified()` after one.
+
+A volume is a sampled function, so it carries TWO types: `dtype`, what a
+sample IS, and `coordinate_dtype`, where the samples STAND. They coincide
+for a real-valued field and come apart for an integer one — int16 CT
+counts on a float32 millimetre grid, which is how a 512-cubed scan holds
+256 MB of samples and not the 512 MB a float32 field would. int16,
+uint16 and uint8 are accepted wherever a field is CONSUMED (`isosurface`,
+`slice_contours`); a generator emits what it computes, so
+`signed_distance_field` and `sphere_sdf` stay real-valued, and
+`resampled` refuses an integer field. A sixth dtype is not a sample type
+at all: an int64, int32 or bool array is converted to float32 at
+construction, and that converted array is what the volume then holds.
+Every `dtype=` below names the type that entry EMITS in — float32 or
+float64 — and an unstated one is the grid's `coordinate_dtype`, so an
+int16 scan surfaces in float32 points. An isovalue is a field value in
+the EMITTED type, not the sample type, so a fractional threshold on an
+integer field is exactly expressible.
+
+### Conversion
+
+- `to_volume(scalars=None)` -> `trueform.Volume` — the cached volume;
+  the same instance while the MTime holds and the same array is asked
+  for. The key is the array, not its spelling, so naming the active
+  scalars and letting them default share one entry. Treat it as
+  read-only.
+
+### Isosurfacing
+
+- `isosurface(iso=None, *, method=None, refine=None, stabilizer=None,
+  dtype=None)` -> `PolyData` — the level set as a welded, indexed
+  triangle mesh. A corner is inside when `sample < iso`, so a signed
+  distance field yields outward windings and a nonzero `iso` on one is
+  an offset surface. `method="flying_edges"` (trueform's default) places
+  a vertex per crossed grid edge and is defined for any field;
+  `"dual_contouring"` places one per surface component of a cell, fitted
+  to the field's own crossings, so creases and corners of a
+  distance-like field survive and the output is manifold by
+  construction. A posed grid answers in world space.
+- `slice_contours(plane_origin, u, v, dims2, spacing2, isovalues, *,
+  dtype=None)` -> line-only `PolyData` — the field resampled once onto
+  an oriented plane's 2D grid and every isovalue contoured on that
+  slice, welded into connected polylines. Node `(i, j)` sits at
+  `plane_origin + i * spacing2[0] * u + j * spacing2[1] * v`, stated in
+  the grid's own space; the result is lifted into world space for a
+  posed grid. Contours terminate cleanly at the volume boundary.
+
+### Field CSG
+
+- `union(other, *, dtype=None)` — `min(a, b)`.
+- `intersection(other, *, dtype=None)` — `max(a, b)`.
+- `difference(other, *, dtype=None)` — `max(a, -b)`, this field minus
+  `other`; the other direction is `other.trueform.difference(this)`.
+
+Each answers an `ImageData`; `other` is an `ImageData` (through its own
+accessor cache) or a `trueform.Volume`. The combinators are exact on the
+zero level set, so the extracted isosurface is exactly the boolean of the
+two solids — bound only by the grid's resolution, where the mesh
+booleans on `PolyData` are exact everywhere. Matching grids AND matching
+poses combine sample-wise and keep that shared pose; anything else
+resamples both operands onto a common world-axis-aligned grid and comes
+back axis-aligned. Out of an operand's domain is outside its solid.
+
+### Resampling
+
+- `resampled(dims, spacing, origin, *, dtype=None)` -> `ImageData` —
+  each target node at `origin + index * spacing` takes the field's
+  trilinear value. An axis-aligned grid regrids in its own space,
+  clamped at the edge; a posed one regrids THROUGH its pose, the target
+  grid being world space, with a sentinel above the field's maximum
+  outside the posed domain. The result is always axis-aligned.
+  Integer-sampled fields are refused by trueform.
+
 ## The CsgGraph wrapper
 
 Built by `csg_graph`. Holds the native graph and nothing else; the
@@ -449,14 +568,38 @@ readers forward and convert.
    a pose — a resample or boolean will read the far-outside sentinel
    past its box rather than clamping at the edge.
 
+10. **A field is one point-data array, and no transpose.** Every volume
+    entry reads the dataset's ACTIVE point scalars —
+    `image.set_active_scalars("ct")` chooses, `to_volume(scalars=...)`
+    and `volume_to_trueform(dataset, scalars=...)` name one explicitly —
+    and every field this package returns rides as `trueform_samples`,
+    active. VTK's point order and trueform's voxel order are the same
+    flat x-fastest run, so the two carriers meet without a reordering
+    pass: `image.point_data["trueform_samples"].reshape(
+    image.dimensions, order="F")` IS `volume.samples`, indexed
+    `[x, y, z]`. Reshaping in C order transposes the field silently —
+    that is the one mistake to make here.
+
+11. **A signed field has a negative inside.** Every field entry reads
+    that convention: `isosurface` calls a corner inside when
+    `sample < iso`, `signed_distance_field` wants a CLOSED mesh and
+    answers a nonnegative field for an open one instead of refusing, and
+    the field booleans refuse unsigned (uint8/uint16) operands, naming
+    the accepted dtypes. A `0/255`
+    segmentation mask is the opposite convention: thresholding it at
+    `127.5` extracts the right surface but winds it INTO the
+    foreground. Negate the mask into a signed field
+    (`127.5 - mask.astype(np.float32)`) for outward windings and for a
+    legal boolean operand.
+
 ## When you need more
 
 This package binds where trueform produces the fact and PyVista holds the
 dataset. trueform's own Python API — expressions, point clouds, primitives,
 index maps, everything — is one conversion away: `to_trueform(dataset)`,
-`dataset.trueform.to_mesh()` or `volume_to_trueform(image)` inward,
-`to_pyvista(...)` / `curves_to_pyvista(...)` /
-`volume_to_pyvista(...)` outward,
+`dataset.trueform.to_mesh()`, `volume_to_trueform(image)` or
+`image.trueform.to_volume()` inward, `to_pyvista(...)` /
+`curves_to_pyvista(...)` / `volume_to_pyvista(...)` outward,
 `CsgGraph.native` for a built graph. What PyVista already does well
 (plain normals, smoothing, general IO) stays PyVista's; this package
 does not shadow it.

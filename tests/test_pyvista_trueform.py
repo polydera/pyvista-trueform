@@ -325,7 +325,11 @@ def test_accessor_boolean_forwards_sheets():
         remove_duplicate_primitivess=False), "remove_duplicate_primitivess"),
     (lambda cube, sheet: tfpv.csg_graph([cube, sheet], triangulatio="cdt"),
      "triangulatio"),
-], ids=["accessor_boolean", "accessor_cleaned", "module_csg_graph"])
+    (lambda cube, sheet: tfpv.sphere_sdf(
+        (4,) * 3, (1.0,) * 3, (0.0,) * 3, (0.0, 0.0, 0.0), 1.0,
+        dtyp=np.float32), "dtyp"),
+], ids=["accessor_boolean", "accessor_cleaned", "module_csg_graph",
+        "module_sphere_sdf"])
 def test_typo_option_raises_typeerror_at_our_signature(call, typo):
     """Every option is a named parameter, so a typo is a TypeError at OUR
     signature naming the unexpected argument — never silently swallowed
@@ -888,6 +892,7 @@ def test_accessor_boundary_edges_and_paths():
 
 
 SAMPLE_DTYPES = [np.float32, np.float64, np.int16, np.uint16, np.uint8]
+SPHERE_RADIUS = 2.0
 
 
 def _image(samples, spacing=(1.0, 1.0, 1.0), origin=(0.0, 0.0, 0.0),
@@ -897,6 +902,18 @@ def _image(samples, spacing=(1.0, 1.0, 1.0), origin=(0.0, 0.0, 0.0),
                          origin=origin)
     image.point_data[name] = np.asfortranarray(samples).ravel(order="F")
     return image
+
+
+def _sphere_field(center=(0.0, 0.0, 0.0)):
+    """A sphere SDF of radius 2 on a grid that resolves it well."""
+    return tfpv.sphere_sdf((48,) * 3, (0.125,) * 3, (-3.0,) * 3, center,
+                           SPHERE_RADIUS)
+
+
+def _lens_volume(radius, distance):
+    """Exact overlap volume of two equal spheres, centers `distance` apart."""
+    return (math.pi * (2 * radius - distance) ** 2
+            * (distance ** 2 + 4 * distance * radius) / (12 * distance))
 
 
 def _polyline_length(curves):
@@ -1127,6 +1144,254 @@ def test_volume_cell_data_refusal_names_the_way_out():
     assert tfpv.volume_to_trueform(moved).dims == (3, 3, 3)
 
 
+def test_volume_accessor_cache_reuses_one_volume_instance():
+    field = _sphere_field()
+    first = field.trueform.to_volume()
+    assert field.trueform.to_volume() is first
+    assert field.trueform.isosurface().n_cells > 0
+    assert field.trueform.to_volume() is first
+
+    # the key is the array, not how it was asked for
+    assert field.trueform.to_volume("trueform_samples") is first
+    assert field.trueform.to_volume() is first
+
+    field.origin = (-3.0, -3.0, -2.75)
+    assert field.trueform.to_volume() is not first
+
+    # a named array is its own key, so the cache never serves another field
+    field.point_data["other"] = np.zeros(field.n_points, dtype=np.float32)
+    named = field.trueform.to_volume("other")
+    assert named is not field.trueform.to_volume()
+    assert float(np.asarray(named.samples).max()) == 0.0
+
+
+def test_volume_accessor_cache_sees_edits_through_the_dataset():
+    """A VTK data array notifies its dataset, so editing samples through
+    the dataset — where a PolyData's raw points would NOT bump the MTime —
+    rebuilds the cached volume by itself."""
+    field = _sphere_field()
+    stale = field.trueform.to_volume()
+
+    field.point_data["trueform_samples"][0] = -42.0
+    fresh = field.trueform.to_volume()
+    assert fresh is not stale
+    assert float(np.asarray(fresh.samples)[0, 0, 0]) == -42.0
+
+    field.origin = (-3.0, -3.0, -2.75)  # the grid's own facts too
+    assert field.trueform.to_volume() is not fresh
+
+
+def test_volume_accessor_cache_survives_an_outside_handle_until_modified():
+    """The volume's own gotcha: a NumPy array handed to VTK stays writable
+    from outside, and such a write reaches no VTK object — which is exactly
+    the buffer volume_to_pyvista hands over."""
+    samples = np.zeros((8, 8, 8), dtype=np.float32, order="F")
+    image = pv.ImageData(dimensions=(8, 8, 8))
+    image.point_data["field"] = samples.ravel(order="F")  # zero-copy
+    stale = image.trueform.to_volume()
+
+    samples[1, 0, 0] = -9.0
+    assert image.point_data["field"][1] == -9.0  # the dataset sees it
+    assert image.trueform.to_volume() is stale   # the cache does not
+    assert float(np.asarray(stale.samples)[1, 0, 0]) == 0.0
+
+    image.Modified()
+    fresh = image.trueform.to_volume()
+    assert fresh is not stale
+    assert float(np.asarray(fresh.samples)[1, 0, 0]) == -9.0
+
+
+def test_accessor_isosurface_recovers_the_sphere():
+    field = _sphere_field()
+    surface = field.trueform.isosurface()
+    assert isinstance(surface, pv.PolyData)
+    assert surface.is_all_triangles
+    assert surface.trueform.is_closed()
+    assert surface.volume == pytest.approx(
+        4 / 3 * math.pi * SPHERE_RADIUS ** 3, rel=1e-2)
+
+    # a nonzero isovalue on an SDF is the offset surface
+    offset = field.trueform.isosurface(0.5)
+    assert offset.volume == pytest.approx(
+        4 / 3 * math.pi * (SPHERE_RADIUS + 0.5) ** 3, rel=1e-2)
+
+
+def test_accessor_isosurface_dual_contouring():
+    field = _sphere_field()
+    sharp = field.trueform.isosurface(method="dual_contouring")
+    assert sharp.trueform.is_closed()
+    assert sharp.trueform.is_manifold()  # manifold by construction
+    assert sharp.volume == pytest.approx(
+        4 / 3 * math.pi * SPHERE_RADIUS ** 3, rel=1e-2)
+
+
+def test_accessor_isosurface_of_a_posed_field_is_world_space():
+    field = _sphere_field()
+    volume = tfpv.volume_to_trueform(field)
+    pose = np.eye(4, dtype=np.float32)
+    pose[:3, 3] = [100.0, 0.0, 0.0]
+    volume.transformation = pose
+
+    posed = tfpv.volume_to_pyvista(volume)
+    np.testing.assert_allclose(posed.origin, [97.0, -3.0, -3.0])
+    surface = posed.trueform.isosurface()
+    np.testing.assert_allclose(np.asarray(surface.points).mean(axis=0),
+                               [100.0, 0.0, 0.0], atol=1e-5)
+    assert surface.volume == pytest.approx(
+        4 / 3 * math.pi * SPHERE_RADIUS ** 3, rel=1e-2)
+
+
+def test_accessor_field_booleans():
+    a = _sphere_field(center=(-0.75, 0.0, 0.0))
+    b = _sphere_field(center=(0.75, 0.0, 0.0))
+    ball = 4 / 3 * math.pi * SPHERE_RADIUS ** 3
+    lens = _lens_volume(SPHERE_RADIUS, 1.5)
+
+    union = a.trueform.union(b)
+    assert isinstance(union, pv.ImageData)
+    assert union.dimensions == a.dimensions
+    assert union.trueform.isosurface().volume == pytest.approx(
+        2 * ball - lens, rel=1e-2)
+
+    intersection = a.trueform.intersection(b)
+    assert intersection.trueform.isosurface().volume == pytest.approx(
+        lens, rel=1e-2)
+
+    difference = a.trueform.difference(b)
+    assert difference.trueform.isosurface().volume == pytest.approx(
+        ball - lens, rel=1e-2)
+
+    # a trueform.Volume operand works the same as an ImageData one
+    native = a.trueform.union(tfpv.volume_to_trueform(b))
+    np.testing.assert_array_equal(native.active_scalars,
+                                  union.active_scalars)
+
+
+def test_accessor_field_boolean_refuses_a_pointless_operand():
+    with pytest.raises(TypeError, match="operand must be"):
+        _sphere_field().trueform.union(_cube())
+
+
+def test_accessor_resampled():
+    field = _sphere_field()
+    coarse = field.trueform.resampled((24,) * 3, (0.25,) * 3, (-3.0,) * 3)
+    assert coarse.dimensions == (24, 24, 24)
+    np.testing.assert_allclose(coarse.spacing, (0.25,) * 3)
+    assert coarse.trueform.isosurface().volume == pytest.approx(
+        4 / 3 * math.pi * SPHERE_RADIUS ** 3, rel=1e-2)
+
+
+def test_accessor_slice_contours():
+    field = _sphere_field()
+    curves = field.trueform.slice_contours(
+        (-3.0, -3.0, 0.0), (1, 0, 0), (0, 1, 0), (96, 96), (0.0625, 0.0625),
+        0.0)
+    assert isinstance(curves, pv.PolyData)
+    assert curves.GetNumberOfLines() == 1  # the sphere's great circle
+    assert curves.GetNumberOfPolys() == 0
+
+    path = vtk_to_numpy(curves.GetLines().GetConnectivityArray())
+    assert path[0] == path[-1]  # one closed contour
+    np.testing.assert_array_equal(np.asarray(curves.points)[:, 2], 0.0)
+    assert _polyline_length(curves) == pytest.approx(
+        2 * math.pi * SPHERE_RADIUS, rel=1e-3)
+
+
+def test_accessor_slice_contours_in_the_datasets_own_frame():
+    """The caller-visible half of the placement rule: a directed grid's
+    local space is still the dataset's own, so a plane stated in the
+    coordinates its origin and spacing speak is the plane trueform cuts —
+    and the curves come back lifted into world space."""
+    field = _directed(_sphere_field())
+    curves = field.trueform.slice_contours(
+        (-3.0, -3.0, 0.0), (1, 0, 0), (0, 1, 0), (96, 96), (0.0625, 0.0625),
+        0.0)
+    assert curves.GetNumberOfLines() == 1  # the sphere's great circle
+    assert _polyline_length(curves) == pytest.approx(
+        2 * math.pi * SPHERE_RADIUS, rel=1e-3)
+
+    # the plane is the dataset's z = 0; in world it is turned about the
+    # grid's own origin, which for a turn about z leaves the height alone
+    np.testing.assert_allclose(np.asarray(curves.points)[:, 2], 0.0,
+                               atol=1e-6)
+
+
+def test_accessor_slice_contours_uncrossed_is_empty():
+    empty = _sphere_field().trueform.slice_contours(
+        (-3.0, -3.0, 0.0), (1, 0, 0), (0, 1, 0), (48, 48), (0.125, 0.125),
+        99.0)  # an isovalue the field never takes
+    assert empty.n_cells == 0
+    assert empty.n_points == 0
+    assert empty.GetNumberOfLines() == 0
+    assert empty.copy().n_cells == 0  # a valid dataset, not a poisoned one
+
+
+def test_accessor_signed_distance_field_known_values():
+    cube = _cube()  # extent [-0.5, 0.5]
+    field = cube.trueform.signed_distance_field(
+        (17,) * 3, (0.125,) * 3, (-1.0,) * 3)
+    assert isinstance(field, pv.ImageData)
+    assert field.dimensions == (17, 17, 17)
+
+    samples = np.asarray(tfpv.volume_to_trueform(field).samples)
+    assert samples[8, 8, 8] == -0.5              # the center, negative inside
+    assert samples[12, 8, 8] == 0.0              # on the +x face
+    assert samples[16, 8, 8] == 0.5              # half a unit outside it
+    assert samples[0, 0, 0] == pytest.approx(math.sqrt(3 * 0.25), rel=1e-6)
+
+    # banded measures a band and sweeps the rest: the sign is exact
+    # everywhere, the magnitude exact inside the band
+    banded = np.asarray(tfpv.volume_to_trueform(
+        cube.trueform.signed_distance_field(
+            (17,) * 3, (0.125,) * 3, (-1.0,) * 3, mode="banded",
+            band=3)).samples)
+    np.testing.assert_array_equal(np.sign(banded), np.sign(samples))
+    assert banded[16, 8, 8] == pytest.approx(0.5, abs=1e-6)
+
+
+def test_volume_integer_field_and_the_mask_convention():
+    """A uint8 mask is consumed as it stands, on a float grid — but it is
+    the opposite of the SDF convention, so its level set winds INTO the
+    foreground and it is no legal boolean operand. Negating it into a
+    signed field is what turns it around."""
+    mask = np.zeros((16, 16, 16), dtype=np.uint8, order="F")
+    mask[4:12, 4:12, 4:12] = 255  # a 4-unit box at 0.5 spacing
+    image = _image(mask, spacing=(0.5,) * 3)
+
+    volume = image.trueform.to_volume()
+    assert volume.dtype == np.uint8          # the measurement is not widened
+    assert volume.coordinate_dtype == np.float32  # the grid it stands on
+
+    inward = image.trueform.isosurface(127.5)  # exact on an integer field
+    assert inward.points.dtype == np.float32   # emitted in the grid's type
+    assert inward.trueform.is_closed()
+    assert inward.trueform.signed_volume() < 0
+
+    signed = _image(127.5 - mask.astype(np.float32), spacing=(0.5,) * 3)
+    outward = signed.trueform.isosurface(0.0)
+    assert outward.trueform.signed_volume() == pytest.approx(
+        -inward.trueform.signed_volume())
+    assert outward.volume == pytest.approx(4.0 ** 3, rel=0.03)
+
+    with pytest.raises(TypeError, match="negative inside"):
+        image.trueform.union(image)
+    with pytest.raises(TypeError, match="no regrid is registered"):
+        image.trueform.resampled((8,) * 3, (1.0,) * 3, (0.0,) * 3)
+
+
+def test_sphere_sdf_matches_trueform():
+    field = tfpv.sphere_sdf((8, 8, 8), (0.5,) * 3, (-2.0,) * 3,
+                            (0.0, 0.0, 0.0), 1.0)
+    volume = tf.sphere_sdf((8, 8, 8), (0.5,) * 3, (-2.0,) * 3,
+                           (0.0, 0.0, 0.0), 1.0)
+    np.testing.assert_array_equal(
+        field.active_scalars, np.asarray(volume.samples).ravel(order="F"))
+    assert field.dimensions == volume.dims
+    np.testing.assert_allclose(field.spacing, volume.spacing)
+    np.testing.assert_allclose(field.origin, volume.origin)
+
+    assert tfpv.sphere_sdf((4,) * 3, (1.0,) * 3, (0.0,) * 3, (0.0,) * 3, 1.0,
+                           dtype=np.float64).active_scalars.dtype == np.float64
 
 
 # -- io ------------------------------------------------------------------
@@ -1778,11 +2043,20 @@ def test_examples_compute():
 # -- packaging -----------------------------------------------------------
 
 
-def test_entry_point_registers_accessor_without_import():
+def test_entry_point_registers_accessors_without_import():
     code = (
+        "import numpy as np\n"
         "import pyvista as pv\n"
         "sphere = pv.Sphere()\n"
         "assert sphere.trueform.is_closed()\n"
+        "field = pv.ImageData(dimensions=(8, 8, 8), spacing=(0.5,) * 3,\n"
+        "                     origin=(-2.0,) * 3)\n"
+        "x, y, z = np.meshgrid(*(np.arange(8.0) * 0.5 - 2.0,) * 3,\n"
+        "                      indexing='ij')\n"
+        "field.point_data['sdf'] = np.asfortranarray(\n"
+        "    np.sqrt(x**2 + y**2 + z**2) - 1.0).astype(np.float32).ravel(\n"
+        "        order='F')\n"
+        "assert field.trueform.isosurface().n_cells > 0\n"
     )
     subprocess.run([sys.executable, "-c", code], check=True)
 
@@ -1816,6 +2090,8 @@ def test_agents_names_every_public_export():
 
     owners = [
         (tfpv.TrueformAccessor, "## The accessor: `dataset.trueform`"),
+        (tfpv.TrueformVolumeAccessor, "## The volume accessor: "
+                                      "`image.trueform`"),
         (tfpv.CsgGraph, "## The CsgGraph wrapper"),
     ]
     for owner, heading in owners:
