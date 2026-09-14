@@ -72,14 +72,15 @@ class TrueformVolumeAccessor:
     changes the volume is discarded whole and rebuilt.
 
     .. warning::
-        A VTK data array notifies its dataset, so editing samples through
-        the dataset (``image.point_data["ct"][k] = ...``,
-        ``image.active_scalars[...] = ...``) DOES advance the MTime —
-        where the same edit through a PolyData's raw points would not.
-        What reaches no VTK object is a write through a NumPy array
-        handed to VTK earlier and still held outside, which is exactly
-        the buffer :func:`pyvista_trueform.volume_to_pyvista` shares with
-        its :class:`trueform.Volume`: after such a write, call
+        What advances the MTime is a fact about the array, not the
+        dataset: a VTK-backed array notifies its owner, a plain NumPy
+        buffer does not. Editing samples through the dataset
+        (``image.point_data["ct"][k] = ...``,
+        ``image.active_scalars[...] = ...``) is therefore seen, and a
+        write to a buffer VTK is only borrowing is not — which is
+        exactly the buffer
+        :func:`pyvista_trueform.volume_to_pyvista` shares with its
+        :class:`trueform.Volume`. After such a write, call
         ``image.Modified()``.
 
     Which array is the field is PyVista's own question to answer: every

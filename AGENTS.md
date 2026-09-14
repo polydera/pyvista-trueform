@@ -20,10 +20,12 @@ Developed jointly by Žiga Sajovic and Claude.
    accessor on `pyvista.ImageData` holds one `trueform.Volume` under the
    same law, keyed by MTime and the array read — the array, never the
    spelling of the request; there the cache also buys the sample copy the
-   conversion owes. Its MTime is livelier than a mesh's: a VTK data array
-   notifies its dataset, so a sample edited through the dataset rebuilds
-   the volume by itself, and only a write through a NumPy handle held
-   from outside VTK needs `Modified()`.
+   conversion owes. What advances an MTime is the same on both carriers
+   and is a fact about the array, not the dataset: a VTK-backed array
+   notifies its owner, a plain NumPy buffer does not. So a sample edited
+   through the dataset rebuilds the volume by itself, and a write to a
+   buffer VTK is only borrowing — the one `volume_to_pyvista` shares —
+   needs `Modified()`.
 
 2. **Conversion direction decides copying.** `to_trueform` and
    `volume_to_trueform` copy — the result is detached from the dataset by

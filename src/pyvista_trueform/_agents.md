@@ -394,15 +394,15 @@ conversion COPIES the samples, so the cache is what keeps a 512-cubed
 scan from being copied per call. Which array is the field is PyVista's
 question: `image.set_active_scalars("ct")` selects one.
 
-The MTime behaves differently here than on a mesh, in the caller's
-favour: a VTK data array notifies its dataset, so editing samples
-through the dataset (`image.point_data["ct"][k] = ...`,
-`image.active_scalars[...] = ...`) advances the MTime and the cache
-rebuilds by itself — where the same edit through a `PolyData`'s raw
-points would not. What reaches no VTK object is a write through a NumPy
-array handed to VTK earlier and still held outside, which is exactly the
-buffer `volume_to_pyvista` shares with its volume; call
-`image.Modified()` after one.
+The MTime rule is the one contract 1 states, read on this carrier: a
+VTK-backed array notifies its dataset, a plain NumPy buffer does not.
+Editing samples through the dataset (`image.point_data["ct"][k] = ...`,
+`image.active_scalars[...] = ...`) advances the MTime, so the cache
+rebuilds by itself; a write to a buffer VTK is only borrowing reaches no
+VTK object and needs `image.Modified()`. The volume's own instance of
+that buffer is the one `volume_to_pyvista` shares with its
+`trueform.Volume` — a field written through the volume's `samples` does
+not pass the ImageData holding it.
 
 A volume is a sampled function, so it carries TWO types: `dtype`, what a
 sample IS, and `coordinate_dtype`, where the samples STAND. They coincide
@@ -509,11 +509,14 @@ readers forward and convert.
    `trueform.Mesh` per dataset, keyed by the dataset's VTK modification
    time — one integer compare per access. While the MTime holds, every
    call reuses the same instance; when it changes, the mesh is discarded
-   whole and rebuilt. VTK only advances the MTime through its own API:
-   mutating a raw NumPy view (`np.asarray(pd.points)[0] = ...`) does NOT
-   bump it, and the accessor keeps serving the stale mesh — call
-   `pd.Modified()` after such edits. Assignments through PyVista's own
-   surface (`pd.points = ...`, `pd.points[0] = ...`) notify VTK already.
+   whole and rebuilt. VTK only advances the MTime through its own API,
+   and the axis is the array, not the carrier: a VTK-backed array
+   notifies its dataset, so assignments through PyVista's own surface
+   (`pd.points = ...`, `pd.points[0] = ...`,
+   `image.point_data["ct"][k] = ...`) are already seen, while a write to
+   a plain NumPy buffer (`np.asarray(pd.points)[0] = ...`, or a buffer
+   VTK is only borrowing) is not — the accessor keeps serving the stale
+   value until `dataset.Modified()`.
 
 2. **`align_*` returns the delta.** The `(4, 4)` matrix maps the
    source's current points onto the target; nothing of the source's own

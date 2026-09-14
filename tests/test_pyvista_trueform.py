@@ -1166,9 +1166,9 @@ def test_volume_accessor_cache_reuses_one_volume_instance():
 
 
 def test_volume_accessor_cache_sees_edits_through_the_dataset():
-    """A VTK data array notifies its dataset, so editing samples through
-    the dataset — where a PolyData's raw points would NOT bump the MTime —
-    rebuilds the cached volume by itself."""
+    """A VTK-backed array notifies its owner, so an edit made through the
+    dataset advances the MTime and rebuilds the cached volume by itself —
+    and so do the grid's own facts."""
     field = _sphere_field()
     stale = field.trueform.to_volume()
 
@@ -1182,9 +1182,9 @@ def test_volume_accessor_cache_sees_edits_through_the_dataset():
 
 
 def test_volume_accessor_cache_survives_an_outside_handle_until_modified():
-    """The volume's own gotcha: a NumPy array handed to VTK stays writable
-    from outside, and such a write reaches no VTK object — which is exactly
-    the buffer volume_to_pyvista hands over."""
+    """The other half of the same rule: a plain NumPy buffer VTK only
+    borrows stays writable, and such a write notifies nobody — which is
+    exactly the buffer volume_to_pyvista hands over."""
     samples = np.zeros((8, 8, 8), dtype=np.float32, order="F")
     image = pv.ImageData(dimensions=(8, 8, 8))
     image.point_data["field"] = samples.ravel(order="F")  # zero-copy
