@@ -285,7 +285,7 @@ tfpv.sphere(1.0, dtype=np.float64, index_dtype=np.int64)  # trueform's defaults 
 
 ![A sphere fractured by a grid of cutters in one csg_graph expression, read back as exploded domain chunks](https://raw.githubusercontent.com/polydera/pyvista-trueform/main/assets/hero_csg_fracture.png)
 
-Eight standalone scripts in `examples/`, each with an importable
+Eleven standalone scripts in `examples/`, each with an importable
 `compute()` and a plotting `main()` (`python examples/<name>.py`); the
 gallery ships in the Polydera color scheme through the shared
 `examples/_theme.py`:
@@ -297,9 +297,16 @@ gallery ships in the Polydera color scheme through the shared
   names it through `closest`.
 - `isobands.py` — height isobands and isocontours overlaid on a
   surface, recut live from a band-count slider.
+- `volume_scan.py` — a NIfTI study read in patient space and surfaced at
+  a Hounsfield threshold; pass a scan path, or let it synthesize, write
+  and read back a posed int16 one.
 - `volume_csg.py` — a box's signed distance field minus a sphere's,
   surfaced by flying edges and by dual contouring side by side, the
   isovalue on a slider.
+- `volume_offset.py` — a torus's own banded distance field read at three
+  offsets, the last one closing the hole.
+- `volume_slice.py` — a field's level sets on one plane, drawn as curves
+  beside the isosurface they cut.
 - `signed_distance.py` — a hills surface recolored live by signed
   distance to a dragged torus probe, diverging about the zero seam.
 - `curvature.py` — Gaussian curvature across a torus and mean curvature

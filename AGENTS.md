@@ -94,6 +94,12 @@ Developed jointly by Žiga Sajovic and Claude.
   `python -m pytest tests` (~1 s) after every change, plus
   `PYVISTA_OFF_SCREEN=true python examples/<name>.py` for any example
   touched — every `main()` must exit clean headless.
+- Every example's `compute()` is also a fixture: the suite runs each one
+  and checks what it claims. The volume surface's four are
+  `examples/volume_scan.py` (a NIfTI study surfaced in patient space),
+  `volume_csg.py` (a field carve read by both extractors),
+  `volume_offset.py` (a banded mesh field at three offsets) and
+  `volume_slice.py` (level sets on a plane beside their isosurface).
 - Verify every trueform signature against the installed wheel or
   /Users/ziga/trueform/python/src/trueform/ BEFORE calling it; never
   guess a kwarg or a return shape. Run the call live before writing its

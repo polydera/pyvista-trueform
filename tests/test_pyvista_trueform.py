@@ -2097,6 +2097,35 @@ def test_examples_compute():
     assert rounded.volume == pytest.approx(remaining, rel=1e-2)
     assert sharp.volume == pytest.approx(remaining, rel=1e-2)
 
+    scan, patient_space = _example("volume_scan").compute()
+    assert scan.active_scalars.dtype == np.int16  # not widened by the file
+    assert not np.allclose(scan.direction_matrix, np.eye(3))  # posed
+    assert patient_space.points.dtype == np.float32
+    assert patient_space.trueform.is_closed()
+    assert patient_space.bounds[4] > 100.0  # where the table put the study
+    # dense tissue is the HIGH side, so the threshold winds into the air
+    assert patient_space.trueform.signed_volume() < 0
+
+    volume_offset = _example("volume_offset")
+    torus, field, shells = volume_offset.compute(resolution=48)
+    assert torus.trueform.is_closed()  # what the sign wants of the input
+    # each shell is the torus grown by its offset, until the last one
+    # closes the hole: a torus by euler characteristic, then a sphere
+    assert [shell.trueform.euler_characteristic() for shell in shells] \
+        == [0, 0, 2]
+    for offset, shell in zip(volume_offset.OFFSETS[:2], shells[:2]):
+        grown = volume_offset.TUBE + offset
+        assert shell.volume == pytest.approx(
+            2 * math.pi ** 2 * volume_offset.RING * grown ** 2, rel=0.03)
+    assert shells[-1].volume > shells[-2].volume
+
+    field, surface, curves = _example("volume_slice").compute(resolution=48)
+    assert surface.trueform.is_closed()
+    # one curve at the zero level set, one per lobe at the negative one,
+    # one around both at the positive one
+    assert curves.GetNumberOfLines() == 4
+    assert curves.GetNumberOfPolys() == 0
+    np.testing.assert_array_equal(np.asarray(curves.points)[:, 2], 0.0)
 
 
 # -- packaging -----------------------------------------------------------
