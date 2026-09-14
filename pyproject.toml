@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pyvista-trueform"
-version = "0.2.0"
+version = "0.3.0"
 description = "PyVista accessor for trueform: exact mesh booleans, arrangements, intersection curves, scalar-field cuts, and volume SDFs."
 readme = "README.md"
 requires-python = ">=3.11"
