@@ -2086,6 +2086,17 @@ def test_examples_compute():
     assert field.shape == (hills.n_points,)
     assert (field < 0).any() and (field > 0).any()
 
+    volume_csg = _example("volume_csg")
+    carved, rounded, sharp = volume_csg.compute(resolution=32)
+    assert carved.dimensions == (32, 32, 32)
+    assert rounded.trueform.is_closed()
+    assert sharp.trueform.is_manifold()
+    # the unit box minus the eighth of the ball its corner holds, both
+    # extractors agreeing on it
+    remaining = 1.0 - (4 / 3 * math.pi * volume_csg.RADIUS ** 3) / 8
+    assert rounded.volume == pytest.approx(remaining, rel=1e-2)
+    assert sharp.volume == pytest.approx(remaining, rel=1e-2)
+
 
 
 # -- packaging -----------------------------------------------------------
