@@ -53,22 +53,19 @@ class _RepairMixin:
         return domains_to_pyvista(cells, ids)
 
     def polygon_arrangements(self, *, return_curves=False, mode=None,
-                             tolerance=None, resolve_crossings=None,
-                             resolve_self_crossings=None,
-                             triangulation=None):
+                             tolerance=None, triangulation=None):
         """The mesh split at its own self-intersection curves.
 
         Per-face provenance rides as ``trueform_face_labels``. See
         :func:`trueform.polygon_arrangements` for what the remaining
-        options control (``mode``, ``tolerance``, ``resolve_crossings``,
-        ``resolve_self_crossings``, ``triangulation``); trueform's defaults
-        apply when omitted.
+        options control (``mode``, ``tolerance``, ``triangulation``);
+        trueform's defaults apply when omitted. A one-form build implies
+        ``within``, so this mesh meeting itself is what it splits at, and
+        crossings between contours resolve unconditionally.
         """
         result = tf.polygon_arrangements(
             self.to_mesh(), return_curves=return_curves,
             **_forwarded(mode=mode, tolerance=tolerance,
-                        resolve_crossings=resolve_crossings,
-                        resolve_self_crossings=resolve_self_crossings,
                         triangulation=triangulation))
         if return_curves:
             mesh, face_labels, curves = result
@@ -84,6 +81,25 @@ class _RepairMixin:
         See :func:`trueform.outer_shell`.
         """
         return to_pyvista(tf.outer_shell(self.to_mesh()))
+
+    def split_non_manifold_vertices(self):
+        """Every fan at a vertex given a vertex of its own.
+
+        A vertex whose faces walk as several fans (a bowtie) keeps its id
+        on the fan holding its smallest face; every other fan takes a
+        minted copy of the coordinates, and its corners are rewired onto
+        it. Faces keep their ids, their arity and their winding. An edge
+        three or more faces carry is crossed by no fan, so a vertex any of
+        whose edges carries 3+ faces is left exactly as it was and
+        :meth:`non_manifold_vertices` still names it.
+
+        Returns ``(polydata, point_map)`` — the separated mesh, and the
+        ``(P,)`` array naming for each output point the input point it
+        copies (an original maps to itself), passed through untouched.
+        See :func:`trueform.split_non_manifold_vertices`.
+        """
+        mesh, point_map = tf.split_non_manifold_vertices(self.to_mesh())
+        return to_pyvista(mesh), point_map
 
     def cleaned(self, tolerance=None, *, return_index_map=None,
                remove_duplicate_primitives=None,

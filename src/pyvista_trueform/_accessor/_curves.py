@@ -17,39 +17,34 @@ from . import _operand_mesh
 class _CurvesMixin:
 
     def intersection_curves(self, other, *, mode=None, tolerance=None,
-                             resolve_crossings=None,
-                             resolve_self_crossings=None):
+                             within=None):
         """Intersection curves with ``other`` as a line-only PolyData.
 
         ``mode`` ("primitives" classifies shared edges/vertices and
         coplanar contacts, "sos" perturbs every contact into a crossing),
         ``tolerance`` (world-coordinate placement distance, 0 = exact),
-        ``resolve_crossings`` (crossings between different contours on the
-        same face), and ``resolve_self_crossings`` (self-crossings within
-        one contour). When omitted, trueform's defaults apply — see
+        and ``within`` (also intersect each mesh with itself, so its own
+        self-crossings resolve in the arrangement these curves are read
+        from — what is emitted stays the cross-mesh seams). Crossings
+        between contours resolve unconditionally; there is no flag for
+        them. When omitted, trueform's defaults apply — see
         :func:`trueform.intersection_curves`.
         """
         return curves_to_pyvista(
             tf.intersection_curves(
                 self.to_mesh(), _operand_mesh(other),
                 **_forwarded(mode=mode, tolerance=tolerance,
-                            resolve_crossings=resolve_crossings,
-                            resolve_self_crossings=resolve_self_crossings)))
+                            within=within)))
 
-    def self_intersection_curves(self, *, mode=None, tolerance=None,
-                                  resolve_crossings=None,
-                                  resolve_self_crossings=None):
+    def self_intersection_curves(self, *, mode=None, tolerance=None):
         """This mesh's self-intersection curves as a line-only PolyData.
 
-        See :meth:`intersection_curves` for the same keyword arguments
-        (``mode``, ``tolerance``, ``resolve_crossings``,
-        ``resolve_self_crossings``) — trueform defaults both crossing
-        options to True here, since a single contour's self-crossings are
-        the whole point. See :func:`trueform.self_intersection_curves`.
+        See :meth:`intersection_curves` for ``mode`` and ``tolerance``. A
+        one-form build implies ``within``, so this mesh meeting itself is
+        what the curves are read from and there is no keyword for it. See
+        :func:`trueform.self_intersection_curves`.
         """
         return curves_to_pyvista(
             tf.self_intersection_curves(
                 self.to_mesh(),
-                **_forwarded(mode=mode, tolerance=tolerance,
-                            resolve_crossings=resolve_crossings,
-                            resolve_self_crossings=resolve_self_crossings)))
+                **_forwarded(mode=mode, tolerance=tolerance)))

@@ -69,6 +69,14 @@ def _two_cubes_concatenated():
     return _polydata(points, [list(f) for f in faces])
 
 
+def _bowtie():
+    """One PolyData whose two triangles meet at vertex 2 and nowhere else."""
+    points = np.array(
+        [[0, 0, 0], [1, 0, 0], [0.5, 1, 0], [1.5, 2, 0], [0.5, 2, 0]],
+        dtype=np.float32)
+    return _polydata(points, [[0, 1, 2], [2, 3, 4]])
+
+
 # -- conversions ---------------------------------------------------------
 
 
@@ -340,6 +348,34 @@ def test_typo_option_raises_typeerror_at_our_signature(call, typo):
         call(cube, sheet)
 
 
+@pytest.mark.parametrize("call,option", [
+    (lambda cube, soup: cube.trueform.intersection_curves(
+        soup, resolve_crossings=True), "resolve_crossings"),
+    (lambda cube, soup: cube.trueform.intersection_curves(
+        soup, resolve_self_crossings=True), "resolve_self_crossings"),
+    (lambda cube, soup: soup.trueform.self_intersection_curves(
+        resolve_crossings=True), "resolve_crossings"),
+    (lambda cube, soup: soup.trueform.polygon_arrangements(
+        resolve_self_crossings=True), "resolve_self_crossings"),
+    (lambda cube, soup: tfpv.csg_graph([cube, soup],
+                                       resolve_crossings=True),
+     "resolve_crossings"),
+    (lambda cube, soup: tfpv.mesh_arrangements(
+        [cube, soup], resolve_self_crossings=True), "resolve_self_crossings"),
+], ids=["accessor_intersection_curves", "accessor_intersection_curves_self",
+        "accessor_self_intersection_curves", "accessor_polygon_arrangements",
+        "module_csg_graph", "module_mesh_arrangements"])
+def test_retired_crossing_options_raise_typeerror(call, option):
+    """trueform resolves crossings between contours unconditionally, so
+    the two flags that once asked for it are gone from every entry — and
+    their absence is a TypeError at OUR signature naming them, never one
+    raised deep inside trueform."""
+    cube = _cube()
+    soup = _two_cubes_concatenated()
+    with pytest.raises(TypeError, match=option):
+        call(cube, soup)
+
+
 def test_accessor_boolean_curves():
     a = _cube()
     b = _cube(center=(0.5, 0.5, 0.5))
@@ -354,6 +390,17 @@ def test_accessor_intersection_curves():
     curves = a.trueform.intersection_curves(b)
     assert curves.GetNumberOfLines() > 0
     assert curves.n_points > 0
+
+
+def test_accessor_intersection_curves_forwards_within():
+    a = _cube()
+    b = _cube(center=(0.5, 0.5, 0.5))
+    seams = a.trueform.intersection_curves(b).GetNumberOfLines()
+    # within adds each operand's own self-intersections to the arrangement
+    # the curves are read from; what is emitted stays the cross-mesh seam,
+    # and neither cube meets itself, so the read is unchanged
+    assert a.trueform.intersection_curves(
+        b, within=True).GetNumberOfLines() == seams
 
 
 def test_accessor_self_intersection_family():
@@ -461,6 +508,37 @@ def test_accessor_triangulated():
     assert triangles.n_cells == 8
 
 
+def test_accessor_split_non_manifold_vertices():
+    bowtie = _bowtie()
+    assert not bowtie.trueform.is_manifold()
+
+    split, point_map = bowtie.trueform.split_non_manifold_vertices()
+    assert isinstance(split, pv.PolyData)
+    assert split.trueform.is_manifold()
+    assert split.n_cells == bowtie.n_cells  # faces keep their ids and arity
+    assert split.n_points == bowtie.n_points + 1  # one fan takes a copy
+    # every original maps to itself; the minted point copies the apex
+    np.testing.assert_array_equal(point_map, [0, 1, 2, 3, 4, 2])
+    np.testing.assert_array_equal(np.asarray(split.points)[5],
+                                  np.asarray(bowtie.points)[2])
+    assert len(split.trueform.non_manifold_vertices()) == 0
+
+
+def test_accessor_split_non_manifold_vertices_leaves_a_carried_edge():
+    """An edge three faces carry is crossed by no fan, so this verb leaves
+    it exactly as it was — and its vertices stay named."""
+    points = np.array(
+        [[0, 0, 0], [1, 0, 0], [0.5, 1, 0], [0.5, -1, 0], [0.5, 0, 1]],
+        dtype=np.float32)
+    fins = _polydata(points, [[0, 1, 2], [0, 1, 3], [0, 1, 4]])
+
+    split, point_map = fins.trueform.split_non_manifold_vertices()
+    assert split.n_points == fins.n_points
+    np.testing.assert_array_equal(point_map, np.arange(fins.n_points))
+    np.testing.assert_array_equal(
+        split.trueform.non_manifold_vertices(), [0, 1])
+
+
 def test_accessor_diagnostics():
     assert _cube().trueform.is_closed()
     assert _cube().trueform.is_manifold()
@@ -483,6 +561,14 @@ def test_accessor_open_and_non_manifold_verdicts():
         dtype=np.float32)
     fins = _polydata(points, [[0, 1, 2], [0, 1, 3], [0, 1, 4]])
     assert fins.trueform.is_non_manifold() is True
+
+
+def test_accessor_has_self_intersections():
+    assert _cube().trueform.has_self_intersections() is False
+    # two overlapping cubes in one soup: faces of one cross faces of the other
+    assert _two_cubes_concatenated().trueform.has_self_intersections() is True
+    # faces sharing a vertex are neighbours, not contacts
+    assert _bowtie().trueform.has_self_intersections() is False
 
 
 # -- remesh --------------------------------------------------------------
@@ -561,6 +647,46 @@ def test_accessor_euler_characteristic():
     assert torus.trueform.euler_characteristic() == 0
 
 
+def test_accessor_face_quality_known_values():
+    cube = _cube()  # 12 right isoceles triangles, legs 1, hypotenuse sqrt(2)
+    quality, min_angle, max_angle, aspect_ratio = cube.trueform.face_quality()
+    assert quality.shape == (cube.n_cells,)
+    np.testing.assert_allclose(quality, 1.0 / math.sqrt(3.0), rtol=1e-6)
+    np.testing.assert_allclose(np.degrees(min_angle), 45.0, rtol=1e-5)
+    np.testing.assert_allclose(np.degrees(max_angle), 90.0, rtol=1e-5)
+    np.testing.assert_allclose(aspect_ratio, math.sqrt(2.0), rtol=1e-6)
+
+
+def test_accessor_face_quality_of_a_non_triangle():
+    plane = pv.Plane(i_resolution=1, j_resolution=1)  # one unit quad
+    quality, min_angle, max_angle, aspect_ratio = plane.trueform.face_quality()
+    assert quality.tolist() == [-1.0]  # the measure is a triangle's
+    np.testing.assert_allclose(np.degrees(min_angle), 90.0, rtol=1e-5)
+    np.testing.assert_allclose(np.degrees(max_angle), 90.0, rtol=1e-5)
+    np.testing.assert_allclose(aspect_ratio, 1.0, rtol=1e-6)
+
+
+def test_accessor_dihedral_angles_of_cube():
+    cube = _cube()  # 12 cube edges turning 90 degrees, 6 flat face diagonals
+    edges, angles = cube.trueform.dihedral_angles()
+    assert edges.shape == (18, 2)
+    assert angles.shape == (18,)
+    degrees = np.degrees(angles)
+    assert np.count_nonzero(np.isclose(degrees, 90.0, atol=1e-4)) == 12
+    assert np.count_nonzero(np.isclose(degrees, 0.0, atol=1e-4)) == 6
+
+
+def test_accessor_dihedral_angles_state_only_shared_edges():
+    points = np.array(
+        [[0, 0, 0], [1, 0, 0], [1, 1, 0], [0, 1, 0]], dtype=np.float32)
+    plane = _polydata(points, [[0, 1, 2], [0, 2, 3]])
+
+    edges, angles = plane.trueform.dihedral_angles()
+    # only the diagonal joins two faces; the four rim edges join none
+    np.testing.assert_array_equal(edges, [[0, 2]])
+    np.testing.assert_allclose(angles, [0.0], atol=1e-6)  # coplanar: flat
+
+
 def test_accessor_signed_distance_known_values():
     cube = _cube()  # extent [-0.5, 0.5], float32
     queries = pv.PolyData(
@@ -618,6 +744,46 @@ def test_accessor_distance_and_intersects():
     assert a.trueform.intersects(near)
 
     assert a.trueform.distance([2.5, 0.0, 0.0]) == 2.0
+
+
+def test_accessor_winding_number_inside_and_outside():
+    cube = _cube()  # closed, extent [-0.5, 0.5]
+    inside = cube.trueform.winding_number([0.0, 0.0, 0.0])
+    assert isinstance(inside, float)
+    assert inside == pytest.approx(1.0)
+    # far nodes answer by their stored expansion, so outside is 0 up to its
+    # accuracy — every verdict on a winding number is a threshold at 0.5
+    assert cube.trueform.winding_number([2.0, 0.0, 0.0]) == pytest.approx(
+        0.0, abs=1e-3)
+
+    # beta is the accuracy knob, forwarded verbatim
+    assert cube.trueform.winding_number(
+        [0.0, 0.0, 0.0], beta=4.0) == pytest.approx(1.0)
+
+    with pytest.raises(ValueError, match=r"query must have shape \(3,\)"):
+        cube.trueform.winding_number([0.0, 0.0])
+
+
+def test_accessor_winding_number_batch_is_always_float64():
+    cube = _cube()  # float32 points
+    batch = tf.Point(np.array([[0.0, 0.0, 0.0], [2.0, 0.0, 0.0]],
+                              dtype=np.float32))
+    assert batch.is_batch
+    values = cube.trueform.winding_number(batch)
+    assert values.shape == (2,)
+    assert values.dtype == np.float64  # dimensionless, not a coordinate
+    np.testing.assert_allclose(values, [1.0, 0.0], atol=1e-3)
+
+
+def test_accessor_winding_number_counts_enclosures():
+    soup = _two_cubes_concatenated()  # [-0.5, 0.5] and [0, 1], overlapping
+    # the overlap pocket lies inside both cubes, the rest inside one
+    assert soup.trueform.winding_number(
+        [0.25, 0.25, 0.25]) == pytest.approx(2.0)
+    assert soup.trueform.winding_number(
+        [-0.25, -0.25, -0.25]) == pytest.approx(1.0)
+    assert soup.trueform.winding_number([3.0, 0.0, 0.0]) == pytest.approx(
+        0.0, abs=1e-3)
 
 
 def test_accessor_queries_speak_trueform_primitives():
@@ -864,6 +1030,23 @@ def test_accessor_non_manifold_paths():
     assert pv.Sphere().trueform.non_manifold_paths().GetNumberOfLines() == 0
 
 
+def test_accessor_non_manifold_vertices():
+    bowtie = _bowtie()  # two fans meeting at vertex 2, no edge shared
+    np.testing.assert_array_equal(
+        bowtie.trueform.non_manifold_vertices(), [2])
+    assert bowtie.trueform.non_manifold_edges().GetNumberOfLines() == 0
+
+    points = np.array(
+        [[0, 0, 0], [1, 0, 0], [0.5, 1, 0], [0.5, -1, 0], [0.5, 0, 1]],
+        dtype=np.float32)
+    fins = _polydata(points, [[0, 1, 2], [0, 1, 3], [0, 1, 4]])
+    # the edge (0, 1) carries three faces, so both its vertices are named
+    np.testing.assert_array_equal(
+        fins.trueform.non_manifold_vertices(), [0, 1])
+
+    assert len(pv.Sphere().trueform.non_manifold_vertices()) == 0
+
+
 def test_accessor_boundary_edges_and_paths():
     points = np.array(
         [[0, 0, 0], [1, 0, 0], [1, 1, 0], [0, 1, 0]], dtype=np.float32)
@@ -886,6 +1069,35 @@ def test_accessor_boundary_edges_and_paths():
 
     assert pv.Sphere().trueform.boundary_edges().GetNumberOfLines() == 0
     assert pv.Sphere().trueform.boundary_paths().GetNumberOfLines() == 0
+
+
+def test_accessor_boundary_rims():
+    points = np.array(
+        [[0, 0, 0], [1, 0, 0], [1, 1, 0], [0, 1, 0]], dtype=np.float32)
+    plane = _polydata(points, [[0, 1, 2], [0, 2, 3]])
+
+    vertices, faces, closed = plane.trueform.boundary_rims()
+    assert isinstance(vertices, tf.OffsetBlockedArray)
+    assert isinstance(faces, tf.OffsetBlockedArray)
+    assert len(vertices) == 1  # the unit-square rim
+    assert closed.tolist() == [1]  # its last edge runs back to vertex 0
+    np.testing.assert_array_equal(vertices[0], [0, 1, 2, 3])
+    # rim edge k runs vertex k -> k + 1, carried by face k alone
+    np.testing.assert_array_equal(faces[0], [0, 0, 1, 1])
+
+    assert len(pv.Sphere().trueform.boundary_rims()[0]) == 0  # closed mesh
+
+
+def test_accessor_boundary_rims_split_at_a_pinch():
+    """A rim ends where the boundary stops passing straight through, so
+    the bowtie's pinch comes back as two rims, not one figure eight."""
+    vertices, faces, closed = _bowtie().trueform.boundary_rims()
+    assert len(vertices) == 2
+    assert closed.tolist() == [1, 1]
+    assert sorted(vertices[0]) == [0, 1, 2]  # the first triangle's own rim
+    assert sorted(vertices[1]) == [2, 3, 4]
+    np.testing.assert_array_equal(faces[0], [0, 0, 0])
+    np.testing.assert_array_equal(faces[1], [1, 1, 1])
 
 
 # -- volumes -------------------------------------------------------------

@@ -84,6 +84,18 @@ class _TopologyMixin:
         return curves_to_pyvista(tf.connect_edges_to_paths(edges),
                                  self.to_mesh().points)
 
+    def non_manifold_vertices(self):
+        """Every vertex whose faces are not one fan, as an ascending
+        ``(N,)`` array of this dataset's own point ids.
+
+        An edge at the vertex carries three or more faces, or its faces
+        fall into several fans meeting at the vertex alone (a bowtie).
+        Winding does not enter the verdict, and a vertex no face names is
+        not reported. Empty when the mesh is manifold. See
+        :func:`trueform.non_manifold_vertices`.
+        """
+        return tf.non_manifold_vertices(self.to_mesh())
+
     def boundary_edges(self):
         """Every edge belonging to exactly one face, as a line-only PolyData.
 
@@ -111,3 +123,21 @@ class _TopologyMixin:
         if len(paths.data) == 0:
             return pv.PolyData()
         return curves_to_pyvista(paths, self.to_mesh().points)
+
+    def boundary_rims(self):
+        """The boundary as rims: the vertices each one walks, the face
+        carrying each of its edges, and whether it closes.
+
+        Returns ``(vertices, faces, closed)`` — two
+        :class:`trueform.OffsetBlockedArray` of one block per rim, passed
+        through untouched, and a ``(R,)`` int8 array nonzero where rim
+        ``i``'s last edge runs back to its first vertex. Rim edge ``k``
+        runs from vertex ``k`` to vertex ``k + 1`` and is carried by face
+        ``k`` alone, so a closed rim of ``n`` vertices has ``n`` edges and
+        an open one ``n - 1``; the ids name this dataset's own points and
+        cells. A rim ends where the boundary stops passing straight
+        through, so a pinch splits it. :meth:`boundary_paths` draws the
+        same boundary as a line-only PolyData instead. See
+        :func:`trueform.boundary_rims`.
+        """
+        return tf.boundary_rims(self.to_mesh())

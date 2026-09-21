@@ -110,17 +110,21 @@ serves `.trueform` too.
 ### N-ary CSG and arrangements
 
 - `csg_graph(datasets, *, sheets=None, mode=None, tolerance=None,
-  resolve_crossings=None, within=None, triangulation=None)` ->
-  `CsgGraph` — one arrangement of N operands (PolyData or
-  `trueform.Mesh`, each through its own accessor cache), arbitrarily
-  many boolean expressions answered against it. A single operand is
-  legal: its own self arrangement.
+  within=None, triangulation=None)` -> `CsgGraph` — one arrangement of N
+  operands (PolyData or `trueform.Mesh`, each through its own accessor
+  cache), arbitrarily many boolean expressions answered against it. A
+  single operand is legal: its own self arrangement.
 - `mesh_arrangements(datasets, *, return_curves=False, mode=None,
-  tolerance=None, resolve_crossings=None, resolve_self_crossings=None,
-  within=None, triangulation=None)` -> labeled `PolyData` — every face
-  split along every intersection curve, provenance as `trueform_labels`
-  / `trueform_face_labels`; with `return_curves=True` also the curves as
-  a second, line-only `PolyData`.
+  tolerance=None, within=None, triangulation=None)` -> labeled
+  `PolyData` — every face split along every intersection curve,
+  provenance as `trueform_labels` / `trueform_face_labels`; with
+  `return_curves=True` also the curves as a second, line-only
+  `PolyData`.
+
+`within` asks for each operand's own self-intersections; crossings
+between contours resolve unconditionally, with no flag to ask for them.
+A one-operand build implies `within`, which is why the one-form entries
+(`self_intersection_curves`, `polygon_arrangements`) do not take it.
 - `domains(datasets_or_graph, expr=None, *, selection=None,
   exclude_outer_shell=None, ignore_open_fragments=None,
   return_source_ids=None, return_index_map=None)` -> `MultiBlock` —
@@ -255,11 +259,12 @@ volume.
 ### Intersection curves
 
 - `intersection_curves(other, *, mode=None, tolerance=None,
-  resolve_crossings=None, resolve_self_crossings=None)` -> line-only
-  `PolyData`.
-- `self_intersection_curves(*, mode=None, tolerance=None,
-  resolve_crossings=None, resolve_self_crossings=None)` -> line-only
-  `PolyData` — trueform defaults both crossing options to True here.
+  within=None)` -> line-only `PolyData` — `within` also intersects each
+  mesh with itself, so its own self-crossings resolve in the arrangement
+  the curves are read from; what is emitted stays the cross-mesh seams.
+- `self_intersection_curves(*, mode=None, tolerance=None)` -> line-only
+  `PolyData` — a one-form build implies `within`, so there is no keyword
+  for it.
 
 ### Scalar-field cuts
 
@@ -279,11 +284,19 @@ volume.
   self-decomposition into volumetric domains, through its own one-operand
   `trueform.CsgGraph`.
 - `polygon_arrangements(*, return_curves=False, mode=None,
-  tolerance=None, resolve_crossings=None, resolve_self_crossings=None,
-  triangulation=None)` -> labeled `PolyData` — the mesh split at its own
-  self-intersection curves; provenance as `trueform_face_labels`.
+  tolerance=None, triangulation=None)` -> labeled `PolyData` — the mesh
+  split at its own self-intersection curves; provenance as
+  `trueform_face_labels`.
 - `outer_shell()` -> `PolyData` — repair to the boundary of the union of
   everything the mesh encloses, free of self-intersections.
+- `split_non_manifold_vertices()` -> `(PolyData, point_map)` — every fan
+  at a vertex given a vertex of its own. The fan holding the smallest
+  face keeps the id, every other takes a minted copy of the coordinates;
+  faces keep their ids, arity and winding. `point_map` is the `(P,)`
+  array naming for each output point the input point it copies, an
+  original itself, passed through untouched. An edge three or more faces
+  carry is crossed by no fan and is left exactly as it was, so
+  `non_manifold_vertices()` still names its vertices.
 - `cleaned(tolerance=None, *, return_index_map=None,
   remove_duplicate_primitives=None, remove_unreferenced_points=None)` ->
   `PolyData` — duplicate vertices and degenerate faces removed;
@@ -327,17 +340,49 @@ face) the surviving labels ride as `trueform_labels`.
   when there are none.
 - `non_manifold_paths()` / `boundary_paths()` -> line-only `PolyData` —
   the same edges assembled into polylines/loops, same point ids.
+- `non_manifold_vertices()` -> ascending `(N,)` array — every vertex
+  whose faces are not one fan, naming this dataset's own points: an edge
+  at it carries 3+ faces, or its faces fall into several fans meeting at
+  the vertex alone (a bowtie). Winding does not enter the verdict.
 - `boundary_curves()` -> line-only `PolyData` — the boundary loops over
   a compacted point set of their own instead.
+- `boundary_rims()` -> `(vertices, faces, closed)` — the boundary as
+  rims: two `trueform.OffsetBlockedArray` of one block per rim, passed
+  through untouched, and a `(R,)` int8 array nonzero where rim `i`
+  closes. Rim edge `k` runs vertex `k` -> `k + 1` and is carried by face
+  `k` alone, so a closed rim of `n` vertices has `n` edges and an open
+  one `n - 1`; the ids name this dataset's own points and cells. A rim
+  ends where the boundary stops passing straight through, so a pinch
+  splits it. `boundary_paths()` draws the same boundary instead.
 
 ### Diagnostics and measures
 
 - `is_closed()`, `is_open()`, `is_manifold()`, `is_non_manifold()` ->
-  bool.
+  bool. Manifold is every vertex's faces being one fan, which also says
+  every edge carries at most two of them; winding never enters it.
+- `has_self_intersections()` -> bool — true when two non-neighbouring
+  faces touch; stopped at the first contact, and faces sharing a vertex
+  or an edge are neighbours rather than contacts.
 - `area()`, `volume()`, `signed_volume()`, `mean_edge_length()` ->
   float.
 - `euler_characteristic()` -> int — `V - E + F`, each undirected edge
   counted once.
+- `face_quality()` -> `(quality, min_angle, max_angle, aspect_ratio)` —
+  four `(n_cells,)` arrays: the triangle quality measure (1 equilateral,
+  approaching 0 for a sliver, `-1` for a face that is not a triangle),
+  the smallest and largest corner angle in radians (unsigned, in
+  `[0, pi]`), and the longest side over the shortest.
+- `dihedral_angles()` -> `(edges, angles)` — an `(E, 2)` array of vertex
+  pairs naming this dataset's own points and the aligned `(E,)` angles
+  in radians between the two face normals, so a flat surface reads 0.
+  One entry per undirected edge TWO faces share: a boundary or
+  non-manifold edge joins no pair and is not stated, so `E` is smaller
+  than the mesh's edge count.
+
+Measure arrays come back raw, as `signed_distance`, `principal_curvatures`
+and `shape_index` do — this package attaches only trueform's own label
+arrays. Attach one where it belongs:
+`dataset.cell_data["quality"] = dataset.trueform.face_quality()[0]`.
 
 ### Spatial queries
 
@@ -353,6 +398,14 @@ face) the surviving labels ride as `trueform_labels`.
   well.
 - `intersects(other)` -> bool — dataset, mesh, or primitive (a batched
   one answers a 0/1 `(N,)` array).
+- `winding_number(query, *, beta=None)` -> float or `(N,)` array — this
+  mesh's generalized winding number at `query`, a `(3,)` point or a
+  `tf.Point`, single or batched. About 1 inside a closed surface, 0
+  outside, fractional for an open sheet or a soup, and the enclosure
+  count where a mesh wraps a point more than once; `beta` is the
+  accuracy knob. ALWAYS float64 — the number is dimensionless, not a
+  coordinate. The winding moments build once and cache with the cached
+  mesh's own tree.
 - `closest_point(query_point, *, radius=None)` ->
   `(face_id, distance, point)` or `None` when `radius` bounds the search
   and nothing lies within; a batched primitive answers

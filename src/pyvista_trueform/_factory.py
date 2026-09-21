@@ -179,7 +179,7 @@ class CsgGraph:
 
 
 def csg_graph(datasets, *, sheets=None, mode=None, tolerance=None,
-             resolve_crossings=None, within=None, triangulation=None):
+             within=None, triangulation=None):
     """Build a :class:`CsgGraph` over PyVista datasets.
 
     One arrangement of N operands, arbitrarily many boolean expressions
@@ -196,9 +196,11 @@ def csg_graph(datasets, *, sheets=None, mode=None, tolerance=None,
     ----------
     datasets : sequence of pyvista.PolyData or trueform.Mesh
         The operands.
-    sheets, mode, tolerance, resolve_crossings, within, triangulation
+    sheets, mode, tolerance, within, triangulation
         Forwarded to :class:`trueform.CsgGraph`; trueform's defaults apply
-        when omitted. See :class:`trueform.CsgGraph` for what each controls.
+        when omitted. See :class:`trueform.CsgGraph` for what each controls
+        — ``within`` asks for each operand's own self-intersections, where
+        crossings between contours resolve unconditionally.
 
     Returns
     -------
@@ -207,15 +209,12 @@ def csg_graph(datasets, *, sheets=None, mode=None, tolerance=None,
     meshes = _normalized_operands([_operand_mesh(dataset)
                                    for dataset in datasets])
     return CsgGraph(tf.CsgGraph(meshes, **_forwarded(
-        sheets=sheets, mode=mode, tolerance=tolerance,
-        resolve_crossings=resolve_crossings, within=within,
+        sheets=sheets, mode=mode, tolerance=tolerance, within=within,
         triangulation=triangulation)))
 
 
 def mesh_arrangements(datasets, *, return_curves=False, mode=None,
-                      tolerance=None, resolve_crossings=None,
-                      resolve_self_crossings=None, within=None,
-                      triangulation=None):
+                      tolerance=None, within=None, triangulation=None):
     """The arrangement of N PyVista datasets as one labeled PolyData.
 
     Every face is split along every intersection curve; the source mesh of
@@ -229,11 +228,13 @@ def mesh_arrangements(datasets, *, return_curves=False, mode=None,
     ----------
     datasets : sequence of pyvista.PolyData or trueform.Mesh
         The operands, two or more.
-    return_curves, mode, tolerance, resolve_crossings, resolve_self_crossings, within, triangulation
+    return_curves, mode, tolerance, within, triangulation
         Forwarded to :func:`trueform.mesh_arrangements`; trueform's
         defaults apply when omitted (except ``return_curves``, whose
         default lives here since this wrapper reads it to shape its own
-        return value).
+        return value). ``within`` asks for each operand's own
+        self-intersections, where crossings between contours resolve
+        unconditionally.
 
     Returns
     -------
@@ -244,8 +245,6 @@ def mesh_arrangements(datasets, *, return_curves=False, mode=None,
     result = tf.mesh_arrangements(meshes, return_curves=return_curves,
                                   **_forwarded(
                                       mode=mode, tolerance=tolerance,
-                                      resolve_crossings=resolve_crossings,
-                                      resolve_self_crossings=resolve_self_crossings,
                                       within=within,
                                       triangulation=triangulation))
     if return_curves:

@@ -219,13 +219,19 @@ remeshed.cell_data["trueform_labels"]  # preserve_regions rides back as cell dat
 a.trueform.volume()                  # .area(), .signed_volume(), .mean_edge_length() too
 a.trueform.is_closed()               # .is_open(), .is_manifold(), .is_non_manifold(),
                                      # .euler_characteristic() too
+a.trueform.has_self_intersections()  # does the mesh meet itself; the first contact stops it
 a.trueform.distance(b)               # euclidean; .intersects(b) too
 a.trueform.signed_distance(b)        # negative inside b; batched over a's own points
 a.plot(scalars=a.trueform.signed_distance(b), cmap="polydera_div")  # packaged map, registered on import
+a.trueform.winding_number([0, 0, 0])  # ~1 inside, ~0 outside; a tf.Point batches it
 a.trueform.closest_point([0, 0, 0])  # (face_id, distance, point)
 a.trueform.closest_points([2, 0, 0], k=3)  # the k nearest, closest first
 a.trueform.closest_point_pair(b)     # witness pair between a and b
 a.trueform.principal_curvatures()    # (k0, k1); .shape_index() too
+
+a.trueform.face_quality()            # (quality, min angle, max angle, aspect ratio) per face
+a.trueform.dihedral_angles()         # (edges, angles) for every edge two faces share
+a.cell_data["quality"] = a.trueform.face_quality()[0]  # measures come back raw: attach them
 
 seg = tf.Segment(np.array([[2, 0, 0], [3, 0, 0]], dtype=np.float32))
 a.trueform.distance(seg)             # queries take trueform primitives; .closest_point(seg) too
@@ -235,6 +241,9 @@ a.trueform.split_components()        # one block per component, as a MultiBlock
 a.trueform.boundary_curves()         # open edges, as line PolyData
 a.trueform.boundary_edges()          # the dataset's own point ids instead; .boundary_paths(),
                                      # .non_manifold_edges(), .non_manifold_paths() too
+a.trueform.boundary_rims()           # (vertices, faces, closed) per rim, same point ids
+a.trueform.non_manifold_vertices()   # the vertices whose faces are not one fan
+a.trueform.split_non_manifold_vertices()  # one vertex per fan; + the point map
 
 ray = tf.Ray(origin=np.array([-2, 0, 0], dtype=np.float32),
             direction=np.array([1, 0, 0], dtype=np.float32))

@@ -37,14 +37,29 @@ class _QueriesMixin:
         return tf.is_open(self.to_mesh())
 
     def is_manifold(self):
-        """True when no edge is shared by more than two faces."""
+        """True when every vertex's faces are one fan — which also says
+        every edge carries at most two of them. Winding does not enter the
+        verdict. See :func:`trueform.is_manifold`.
+        """
         return tf.is_manifold(self.to_mesh())
 
     def is_non_manifold(self):
-        """True when some edge is shared by more than two faces.
+        """True when some edge carries more than two faces, or some
+        vertex's faces fall into more than one fan (a bowtie).
         See :func:`trueform.is_non_manifold`.
         """
         return tf.is_non_manifold(self.to_mesh())
+
+    def has_self_intersections(self):
+        """True when two non-neighbouring faces of this mesh touch.
+
+        The discovery stops at the first contact, so a mesh that meets
+        itself answers without the rest of it being seen. Faces sharing a
+        vertex or an edge are neighbours rather than contacts, so a
+        bowtie or a fan does not make the verdict true on its own. See
+        :func:`trueform.has_self_intersections`.
+        """
+        return tf.has_self_intersections(self.to_mesh())
 
     def area(self):
         """Total surface area. See :func:`trueform.area`."""
@@ -74,6 +89,35 @@ class _QueriesMixin:
         See :func:`trueform.euler_characteristic`.
         """
         return tf.euler_characteristic(self.to_mesh())
+
+    def face_quality(self):
+        """Per-face quality, corner angles, and aspect ratio.
+
+        Returns ``(quality, min_angle, max_angle, aspect_ratio)``, each a
+        ``(n_cells,)`` array: the triangle quality measure (1 for
+        equilateral, approaching 0 for a sliver, ``-1`` for a face that is
+        not a triangle), the smallest and largest corner angle in radians
+        (unsigned, in ``[0, pi]``, so a reflex corner reads its
+        explement), and the longest side over the shortest. Attach one
+        with ``dataset.cell_data["quality"] =
+        dataset.trueform.face_quality()[0]``. See
+        :func:`trueform.face_quality`.
+        """
+        return tf.face_quality(self.to_mesh())
+
+    def dihedral_angles(self):
+        """The angle each edge two faces share turns through.
+
+        Returns ``(edges, angles)`` — an ``(E, 2)`` array of vertex-id
+        pairs naming this dataset's own points, and the aligned ``(E,)``
+        angles in radians between the two face normals, so a flat surface
+        reads 0. One entry per undirected edge TWO faces share: a
+        boundary or non-manifold edge joins no pair and is not stated, so
+        ``E`` is smaller than the mesh's edge count and the angles attach
+        to the edges, not to this dataset's cells. See
+        :func:`trueform.dihedral_angles`.
+        """
+        return tf.dihedral_angles(self.to_mesh())
 
     def ray_cast(self, ray, config=None):
         """First mesh face hit by the ray, through the cached spatial tree.
@@ -135,6 +179,26 @@ class _QueriesMixin:
         if isinstance(other, tf.Primitive):
             return tf.intersects(self.to_mesh(), other)
         return tf.intersects(self.to_mesh(), _operand_mesh(other))
+
+    def winding_number(self, query, *, beta=None):
+        """This mesh's generalized winding number at ``query``.
+
+        About 1 inside a closed surface, 0 outside, and a graceful
+        fractional value for an open sheet or a soup — the query for the
+        inputs the exact predicates refuse, and the enclosure count where
+        a mesh wraps a point more than once. ``query`` is a ``(3,)``
+        point or a :class:`trueform.Point`, single or batched; ``beta``
+        is the accuracy knob, larger descending deeper into the tree.
+        Returns a float for a single query and a ``(N,)`` array for a
+        batched one — always float64, the number being dimensionless
+        whatever the mesh's dtype. The winding moments build once and
+        cache with the cached mesh's own spatial tree, so repeated
+        queries amortize. See :func:`trueform.winding_number`.
+        """
+        if not isinstance(query, tf.Primitive):
+            query = tf.Point(self._query_point(query, "query"))
+        return tf.winding_number(self.to_mesh(), query,
+                                 **_forwarded(beta=beta))
 
     def closest_point(self, query_point, *, radius=None):
         """The mesh point closest to ``query_point``.
