@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pyvista-trueform"
-version = "0.3.0"
+version = "0.4.0"
 description = "PyVista accessor for trueform: exact mesh booleans, arrangements, intersection curves, scalar-field cuts, and volume SDFs."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -25,7 +25,7 @@ keywords = [
   "nifti",
 ]
 dependencies = [
-  "trueform>=0.10.4",
+  "trueform>=0.10.5",
   "pyvista>=0.48",
   "numpy>=1.23",
 ]
